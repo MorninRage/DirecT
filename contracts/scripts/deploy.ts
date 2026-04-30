@@ -5,6 +5,11 @@ const GENESIS_SUPPLY = ethers.parseEther("1000000000");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
+  if (!deployer) {
+    throw new Error(
+      "No deployer account: set DEPLOYER_PRIVATE_KEY in the environment or in contracts/.env (see .env.example), then fund that address with Base Sepolia ETH.",
+    );
+  }
   const Token = await ethers.getContractFactory("DirecTToken");
   const token = await Token.deploy(deployer.address);
   await token.waitForDeployment();

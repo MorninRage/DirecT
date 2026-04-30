@@ -27,8 +27,18 @@ npx hardhat test
 # Local / CI (no on-chain deploy)
 npx hardhat run scripts/deploy.ts --network hardhat
 
-# Base Sepolia (set funded key)
-DEPLOYER_PRIVATE_KEY=0x... npx hardhat run scripts/deploy.ts --network baseSepolia
+# Base Sepolia — fund the deployer address with Sepolia ETH on Base first, then either:
+#   • cp .env.example .env  → set DEPLOYER_PRIVATE_KEY=0x…
+#   • or PowerShell: $env:DEPLOYER_PRIVATE_KEY='0x…'; npx hardhat run scripts/deploy.ts --network baseSepolia
+
+npx hardhat run scripts/deploy.ts --network baseSepolia
+```
+
+Then set **Netlify** (or `netlify env:set`) with the printed addresses:
+
+```bash
+netlify env:set VITE_TOKEN_ADDRESS "0x…YourDirecTToken…" --context production
+netlify env:set VITE_EMISSIONS_ADDRESS "0x…YourEmissions…" --context production
 ```
 
 Prints addresses for `VITE_TOKEN_ADDRESS` and `VITE_EMISSIONS_ADDRESS` for the web app.
