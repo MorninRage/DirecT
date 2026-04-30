@@ -104,9 +104,9 @@ You should see JSON with `"ok": true`.
 1. Netlify dashboard → **Add new site** → **Import an existing project**.
 2. Connect Git provider → select **this repo**.
 3. Netlify reads **root** [`netlify.toml`](../../netlify.toml):
-   - **Base directory:** `apps/web` (already set via `base` in toml)
+   - **Base directory:** `apps/web` (set via `base`)
    - **Build command:** `npm run build`
-   - **Publish directory:** `dist` (relative to base)
+   - **Publish directory:** `apps/web/dist` (relative to **repository root**; required when using `base`)
 
 ### Build environment variables (required)
 

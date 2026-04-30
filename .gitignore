@@ -7,3 +7,6 @@ out/
 .env
 *.log
 .DS_Store
+
+# Local Netlify folder
+.netlify

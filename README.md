@@ -41,7 +41,7 @@ Full steps, env vars, and troubleshooting: **[`docs/deploy/online.md`](docs/depl
 
 - **GitHub:** `https://github.com/MorninRage/DirecT`  
 - **Fly.io** — host the **`relay/`** API (Dockerfile + `relay/fly.toml`).  
-- **Netlify** — import **MorninRage/DirecT**; root **`netlify.toml`** sets monorepo base + SPA redirects + `VITE_*` for the relay.  
+- **Netlify:** `https://morninrage-direct.netlify.app` — [dashboard](https://app.netlify.com/projects/morninrage-direct) (site linked locally; connect **MorninRage/DirecT** in the UI for CI).  
 - **Netlify does not host Git** — it builds from your GitHub repo.
 
 ### 3. Contracts

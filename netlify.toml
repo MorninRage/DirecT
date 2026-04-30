@@ -1,9 +1,11 @@
 # Netlify: DirecT web (Vite SPA under apps/web)
-# GitHub: https://github.com/MorninRage/DirecT — team / account: morninrage (match your other sites).
+# GitHub: https://github.com/MorninRage/DirecT — team: morninrage
 #
-# Dashboard: create site name **DirecT** (slug often direct-morninrage or morninrage-direct — must be unique).
-# Import from Git → MorninRage/DirecT → Netlify reads this file at repo root.
-# CLI (after netlify login): from repo root run  netlify init  or  netlify link
+# Production: https://morninrage-direct.netlify.app
+# Dashboard: https://app.netlify.com/projects/morninrage-direct
+#
+# Enable Git builds: Netlify → this site → Build & deploy → Link repository → MorninRage/DirecT, branch main.
+# CLI (from repo root, after netlify link): netlify deploy --build --prod
 #
 # Relay URL must match relay/fly.toml app name (production):
 #   https://morninrage-direct-relay.fly.dev
@@ -13,7 +15,8 @@
 [build]
   base = "apps/web"
   command = "npm run build"
-  publish = "dist"
+  # Publish path is relative to repo root (not `base`). Output is apps/web/dist after Vite build.
+  publish = "apps/web/dist"
 
 # Single-page app: send all routes to index.html
 [[redirects]]
