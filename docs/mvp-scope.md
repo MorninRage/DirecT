@@ -10,7 +10,7 @@
 |-----------|--------|--------|
 | **M1** Relay + web post/read signed payloads | **Done** | Web on Netlify, relay on Fly, persistence on Fly volume |
 | **M2** Contracts on testnet; DIR minted to treasury | **Done** | Base Sepolia: `DirecTToken` + `EmissionsController`; 1B DIR genesis to deployer; 10M DIR in controller pool |
-| **M3** Metrics export → Merkle → test payout | **Done** | Snapshot export, `build-epoch.cjs`, `epoch:register`, web `/claim`, relay epoch registry + bell |
+| **M3** Metrics export → Merkle → test payout | **Done (code)** | Operator must run [epoch runbook](deploy/current-environment.md#m3-epoch--claim-runbook) + [publish to relay](deploy/current-environment.md#why-rewards-shows-no-epoch-published-on-the-relay-yet) for users to see Rewards; proves “paid users” on testnet. |
 
 **Live snapshot:** [deploy/current-environment.md](deploy/current-environment.md) (URLs, contract table, `ship:online` script list).
 

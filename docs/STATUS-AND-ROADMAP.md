@@ -16,6 +16,12 @@ DirecT is an MVP stack that proves:
 
 Social layer v1 adds **asymmetric follow**, a **following-scoped feed**, and **notifications** for social activity plus **claimable rewards** hints.
 
+### “Fully live” for paying users
+
+All **client, relay, and contract code** for Merkle claims is in place. **Rewards** stays empty until an **operator** runs the pipeline documented in [deploy/current-environment.md — “No epoch published”](deploy/current-environment.md#why-rewards-shows-no-epoch-published-on-the-relay-yet) and [§ M3 runbook](deploy/current-environment.md#m3-epoch--claim-runbook): snapshot → **`build-epoch.cjs`** → **`registerRoot`** → **`POST /v1/admin/rewards-epochs`**. There is **no separate automated oracle** in-repo; cadence (weekly, monthly, etc.) is your ops choice.
+
+After the first epoch is published, **paid users** (testnet DIR) are whoever appears in **`allocations`** and successfully **`claim`**s with the linked wallet.
+
 ---
 
 ## 2. Repository map (where things live)

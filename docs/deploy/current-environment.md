@@ -20,6 +20,45 @@ Authoritative addresses after a deploy live in **`contracts/deployments/baseSepo
 
 Genesis (from `contracts/scripts/deploy.ts`): **1B DIR** minted to deployer treasury; **10M DIR** transferred into `EmissionsController` as the MVP rewards pool for Merkle claims.
 
+## Why Rewards shows “No epoch published on the relay yet”
+
+**The web app and relay are working.** That copy appears when **`GET /v1/rewards/epochs/latest`** returns **`epoch: null`** — i.e. nothing has been written to **`rewards-epochs.json`** on the relay yet.
+
+Shipping “fully live” payouts is **not** another engineering milestone in this repo: it is the **operator runbook** below (export → build → `registerRoot` → **publish epoch to relay**). Until step 5 runs successfully, users will never see an allocation on **Rewards**.
+
+**Quick verify**
+
+```bash
+curl -sS "https://morninrage-direct-relay.fly.dev/v1/rewards/epochs/latest"
+# {"epoch":null}  → no epoch published yet
+# {"epoch":{...}} → app will show epoch + claim UI for eligible wallets
+```
+
+**Creator prerequisites (so your tree is not empty)**
+
+- Profiles need **`linkedWallets`** (or **`payoutAddress`**) so `build-epoch.cjs` knows the on-chain **beneficiary** for each handle.
+- Scoring only includes **posts/reposts** with a **`direct_handle`** and uses relay **metrics** (reactions, comments, shares) on those `eid`s. No engagement → zero allocation.
+
+**Relay prerequisite**
+
+- Set **`INDEXER_SECRET`** on Fly (`fly secrets set`) so you can call **`GET /v1/indexer/snapshot`** and **`POST /v1/admin/rewards-epochs`**.
+
+**Admin API body vs epoch file**
+
+The builder writes **`epochId`** in `epoch-*.json`; **`PublishedRewardEpoch`** on the relay expects **`id`** (same string). Map fields when posting, e.g. **`id`** = file’s **`epochId`**, **`publishedAtMs`** = milliseconds (often same as **`builtAtMs`** from the file, or `Date.now()` at publish time), plus **`root`**, **`chainId`**, **`allocations`**, optional **`registerTxHash`**.
+
+Example `jq` to build a POST body from a registered epoch file:
+
+```bash
+jq '{id: .epochId, root, chainId, publishedAtMs: .builtAtMs, registerTxHash, allocations}' ../epochs/epoch-myepoch.json > publish-payload.json
+curl -fsS -X POST "https://morninrage-direct-relay.fly.dev/v1/admin/rewards-epochs" \
+  -H "Content-Type: application/json" \
+  -H "x-indexer-secret: $INDEXER_SECRET" \
+  -d @publish-payload.json
+```
+
+After a `201`, reload **Rewards**: eligible users (wallets in **`allocations`**) see amounts and can **`claim`** if the root is active on-chain and the pool is funded.
+
 ## Automation (`contracts/`)
 
 | Script | Purpose |
