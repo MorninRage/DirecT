@@ -2,7 +2,7 @@
 
 This guide wires the **relay API** (Node/Express on [Fly.io](https://fly.io/docs/)) and the **web app** (Vite/React on [Netlify](https://docs.netlify.com/)) so anyone can use the site over HTTPS.
 
-> **Persistence:** **Accounts and login sessions** are stored under **`DATA_DIR`** (Fly: **`/data`** volume **`morninrage_direct_relay_data`**). Cold starts and redeploys keep sign-ups and tokens. **Posts, feed, and media** are still **in-memory** on the relay; treat them as ephemeral until you add a database or object storage.
+> **Persistence:** The Fly relay stores **accounts**, **sessions**, **events/posts**, **metrics**, and **media** under **`DATA_DIR`** (Fly: **`/data`** volume). Redeploys keep data on the volume.
 
 ---
 
@@ -10,14 +10,14 @@ This guide wires the **relay API** (Node/Express on [Fly.io](https://fly.io/docs
 
 | Area | Status |
 |------|--------|
-| Web: auth, profiles, feed, My page, settings, notifications (client + relay) | **Working** against a running relay |
-| Relay: signed events, feed, metrics, media, accounts API | Accounts/sessions **persist on disk** (Fly volume); events/media **in-memory** |
+| Web: auth, profiles, feed, My page, settings, notifications, **wallet dashboard (ETH + DIR balance)** | **Working** when `VITE_TOKEN_ADDRESS` is set at build time |
+| Relay: signed events, feed, metrics, media, accounts API | **Persists** on Fly volume (`relay-state.json`, `events-state.json`, `media/`) |
 | Chain verification `CHAIN_ID` on relay | Configurable via env (`84532` Base Sepolia default) |
-| Contracts: DIR + EmissionsController | **In repo**; **not required** for read/post MVP if you only exercise relay + wallets |
-| Production DB / blob storage for posts & media | **Not** in repo |
-| Merkle payouts / emissions oracle wired to web | **Stub / testnet path** per [`mvp-scope.md`](../mvp-scope.md) |
+| Contracts: **1B cap DIR** + **transfer-based EmissionsController** | **In repo**; deploy to testnet and set Netlify env vars |
+| Merkle claim UI in web | **Not** built; claims are on-chain via wallet tooling |
+| Full emissions oracle / indexer → Merkle automation | **Not** in repo |
 
-**“Fully works online”** for the current codebase means: **Netlify URL** loads the SPA, **Fly URL** serves `/v1/*`, and the SPA’s **`VITE_RELAY_URL`** points at Fly. Wallets still talk to **`VITE_RPC_URL`** on Base Sepolia (or whatever L2 you configure).
+**“Fully works online”** means: Netlify SPA, Fly relay, matching `VITE_CHAIN_ID` / relay `CHAIN_ID`, and (for DIR balances) **`VITE_TOKEN_ADDRESS`** from your deployment.
 
 ---
 
@@ -130,6 +130,8 @@ In **Site configuration → Environment variables → Builds**, add:
 | `VITE_RELAY_URL` | `https://your-relay.fly.dev` (no trailing slash) |
 | `VITE_CHAIN_ID` | `84532` |
 | `VITE_RPC_URL` | `https://sepolia.base.org` (or Alchemy/Infura URL) |
+| `VITE_TOKEN_ADDRESS` | DirecTToken `0x…` after deploy (enables **DIR** balance in Wallet UI) |
+| `VITE_EMISSIONS_ADDRESS` | EmissionsController `0x…` after deploy (for future claim flows / docs) |
 
 Redeploy after changing env vars (Vite bakes them in at build time).
 
@@ -168,7 +170,7 @@ The relay uses `cors()` wide open — acceptable for early demos. Before mainnet
 | Signature / chain errors | `CHAIN_ID` mismatch between relay and `VITE_CHAIN_ID`, or wallet on wrong network. |
 | 404 on refresh deep link | Netlify SPA redirect missing — check `netlify.toml`. |
 | `invalid_credentials` after a correct password | Relay had no volume / cold machine with empty memory; accounts file missing. Create Fly volume, redeploy, **or** re-register. With volume + `DATA_DIR=/data`, accounts survive restarts. |
-| Feed or posts “reset” after a while | Posts and media are **still in-memory** on the relay; only **accounts/sessions** persist. Expected until you add DB/storage. |
+| Feed or posts “reset” after a while | Old behavior: relay RAM-only. **Current:** posts persist on Fly volume; if you still see loss, check `DATA_DIR` and volume mount. |
 
 ---
 

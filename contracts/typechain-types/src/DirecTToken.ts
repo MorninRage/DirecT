@@ -40,6 +40,7 @@ export interface DirecTTokenInterface extends Interface {
     nameOrSignature:
       | "CLOCK_MODE"
       | "DOMAIN_SEPARATOR"
+      | "MAX_SUPPLY"
       | "allowance"
       | "approve"
       | "balanceOf"
@@ -86,6 +87,10 @@ export interface DirecTTokenInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "DOMAIN_SEPARATOR",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MAX_SUPPLY",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -200,6 +205,7 @@ export interface DirecTTokenInterface extends Interface {
     functionFragment: "DOMAIN_SEPARATOR",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "MAX_SUPPLY", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
@@ -410,6 +416,8 @@ export interface DirecTToken extends BaseContract {
 
   DOMAIN_SEPARATOR: TypedContractMethod<[], [string], "view">;
 
+  MAX_SUPPLY: TypedContractMethod<[], [bigint], "view">;
+
   allowance: TypedContractMethod<
     [owner: AddressLike, spender: AddressLike],
     [bigint],
@@ -553,6 +561,9 @@ export interface DirecTToken extends BaseContract {
   getFunction(
     nameOrSignature: "DOMAIN_SEPARATOR"
   ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "MAX_SUPPLY"
+  ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "allowance"
   ): TypedContractMethod<

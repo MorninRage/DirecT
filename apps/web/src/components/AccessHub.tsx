@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { appChain } from "../chains";
 import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { useAccountProfile } from "../auth/AccountProvider";
+import { WalletDashboard } from "./WalletDashboard";
 
 type Props = { open: boolean; onClose: () => void };
 
@@ -68,7 +69,7 @@ export function AccessHub({ open, onClose }: Props) {
   return (
     <div className="hud-modal-overlay" role="dialog" aria-modal="true">
       <div className="hud-modal" style={{ maxWidth: 520 }}>
-        <h2>Wallet & signing</h2>
+        <h2>DirecT wallet</h2>
         <p style={{ color: "var(--hud-dim)", marginTop: 0, fontSize: 14, lineHeight: 1.5 }}>
           Connect a wallet or use an embedded DirecT key to <strong>sign posts</strong>. This is separate from your profile password.
           {profile ? (
@@ -82,6 +83,12 @@ export function AccessHub({ open, onClose }: Props) {
             </>
           ) : null}
         </p>
+
+        {address ? <WalletDashboard address={address} /> : (
+          <p style={{ fontSize: 12, color: "var(--hud-dim)", marginBottom: 16, lineHeight: 1.5 }}>
+            Connect MetaMask / Coinbase or generate an <strong>embedded DirecT key</strong> below. Your address then appears here with <strong>ETH</strong> and <strong>DIR</strong> balances (DIR needs <code>VITE_TOKEN_ADDRESS</code> set at build time).
+          </p>
+        )}
 
         <div className="hud-label">Extension / mobile wallets</div>
         <div className="hud-connector-list">

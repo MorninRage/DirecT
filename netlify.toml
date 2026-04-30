@@ -3,20 +3,21 @@
 #
 # CLI-linked site (this folder): https://direct-social.netlify.app
 #   Dashboard: https://app.netlify.com/projects/direct-social
-# If you use a different site slug, run: netlify link
 #
 # Relay (Fly) for production API:
 #   https://morninrage-direct-relay.fly.dev
 #
-# Optional overrides in the UI: VITE_TOKEN_ADDRESS, VITE_EMISSIONS_ADDRESS
+# After deploying contracts to Base Sepolia (`contracts/scripts/deploy.ts`), add in
+# Netlify → Site configuration → Environment variables → Build (overrides below if needed):
+#   VITE_TOKEN_ADDRESS=<DirecTToken 0x address>
+#   VITE_EMISSIONS_ADDRESS=<EmissionsController 0x address>
+# Then trigger a new deploy so Vite bakes them into the bundle.
 
 [build]
   base = "apps/web"
   command = "npm run build"
-  # Publish path is relative to repo root (not `base`). Output is apps/web/dist after Vite build.
   publish = "apps/web/dist"
 
-# Single-page app: send all routes to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -18,6 +18,8 @@ export type { IERC20Errors } from "./@openzeppelin/contracts/interfaces/draft-IE
 export { IERC20Errors__factory } from "./factories/@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC20Errors__factory";
 export type { IERC721Errors } from "./@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC721Errors";
 export { IERC721Errors__factory } from "./factories/@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC721Errors__factory";
+export type { IERC1363 } from "./@openzeppelin/contracts/interfaces/IERC1363";
+export { IERC1363__factory } from "./factories/@openzeppelin/contracts/interfaces/IERC1363__factory";
 export type { IERC5267 } from "./@openzeppelin/contracts/interfaces/IERC5267";
 export { IERC5267__factory } from "./factories/@openzeppelin/contracts/interfaces/IERC5267__factory";
 export type { IERC5805 } from "./@openzeppelin/contracts/interfaces/IERC5805";
@@ -36,6 +38,8 @@ export type { IERC20Permit } from "./@openzeppelin/contracts/token/ERC20/extensi
 export { IERC20Permit__factory } from "./factories/@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit__factory";
 export type { IERC20 } from "./@openzeppelin/contracts/token/ERC20/IERC20";
 export { IERC20__factory } from "./factories/@openzeppelin/contracts/token/ERC20/IERC20__factory";
+export type { SafeERC20 } from "./@openzeppelin/contracts/token/ERC20/utils/SafeERC20";
+export { SafeERC20__factory } from "./factories/@openzeppelin/contracts/token/ERC20/utils/SafeERC20__factory";
 export type { ECDSA } from "./@openzeppelin/contracts/utils/cryptography/ECDSA";
 export { ECDSA__factory } from "./factories/@openzeppelin/contracts/utils/cryptography/ECDSA__factory";
 export type { EIP712 } from "./@openzeppelin/contracts/utils/cryptography/EIP712";
@@ -44,6 +48,8 @@ export type { MerkleProof } from "./@openzeppelin/contracts/utils/cryptography/M
 export { MerkleProof__factory } from "./factories/@openzeppelin/contracts/utils/cryptography/MerkleProof__factory";
 export type { MessageHashUtils } from "./@openzeppelin/contracts/utils/cryptography/MessageHashUtils";
 export { MessageHashUtils__factory } from "./factories/@openzeppelin/contracts/utils/cryptography/MessageHashUtils__factory";
+export type { IERC165 } from "./@openzeppelin/contracts/utils/introspection/IERC165";
+export { IERC165__factory } from "./factories/@openzeppelin/contracts/utils/introspection/IERC165__factory";
 export type { SafeCast } from "./@openzeppelin/contracts/utils/math/SafeCast";
 export { SafeCast__factory } from "./factories/@openzeppelin/contracts/utils/math/SafeCast__factory";
 export type { Nonces } from "./@openzeppelin/contracts/utils/Nonces";
