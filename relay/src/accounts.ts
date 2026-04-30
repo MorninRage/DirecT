@@ -1,5 +1,47 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { verifyMessage, type Address, type Hex } from "viem";
+
+/** Persisted under DATA_DIR (Fly volume: /data; local: relay/data). */
+const dataDir = process.env.DATA_DIR ?? join(process.cwd(), "data");
+const statePath = join(dataDir, "relay-state.json");
+
+function persistAccountsState(): void {
+  try {
+    if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
+    const now = Date.now();
+    const payload = {
+      accounts: [...accounts.entries()],
+      sessions: [...sessions.entries()].filter(([, s]) => s.exp > now),
+    };
+    writeFileSync(statePath, JSON.stringify(payload), "utf8");
+  } catch (err) {
+    console.error("[relay] persist state failed:", err);
+  }
+}
+
+function loadAccountsState(): void {
+  if (!existsSync(statePath)) return;
+  try {
+    const raw = JSON.parse(readFileSync(statePath, "utf8")) as {
+      accounts?: [string, StoredAccount][];
+      sessions?: [string, { handle: string; exp: number }][];
+    };
+    accounts.clear();
+    sessions.clear();
+    const now = Date.now();
+    for (const [k, v] of raw.accounts ?? []) {
+      if (k && v?.handle && v.passwordSalt && v.passwordHash && v.profile) accounts.set(k, v);
+    }
+    for (const [k, v] of raw.sessions ?? []) {
+      if (k && v?.handle && v.exp > now) sessions.set(k, v);
+    }
+    console.log(`[relay] loaded ${accounts.size} accounts, ${sessions.size} sessions from ${statePath}`);
+  } catch (err) {
+    console.error("[relay] load state failed:", err);
+  }
+}
 
 export type LayoutItem = {
   i: string;
@@ -42,6 +84,8 @@ const sessions = new Map<string, { handle: string; exp: number }>();
 const accounts = new Map<string, StoredAccount>();
 
 const SESSION_MS = 1000 * 60 * 60 * 24 * 14;
+
+loadAccountsState();
 
 export function defaultAccountSettings(): AccountProfile["settings"] {
   return {
@@ -109,6 +153,7 @@ export function registerAccount(handleRaw: string, password: string, displayName
   const { salt, hash } = hashPassword(password);
   const profile = defaultProfile(handle, displayName);
   accounts.set(handle, { handle, passwordSalt: salt, passwordHash: hash, profile });
+  persistAccountsState();
   return profile;
 }
 
@@ -120,6 +165,7 @@ export function login(handleRaw: string, password: string): string {
   if (!verifyPassword(password, acc.passwordSalt, acc.passwordHash)) throw new Error("invalid_credentials");
   const token = randomBytes(32).toString("hex");
   sessions.set(token, { handle, exp: Date.now() + SESSION_MS });
+  persistAccountsState();
   return token;
 }
 
@@ -165,6 +211,7 @@ export function updateProfile(handle: string, patch: Partial<AccountProfile>): A
     linkedWallets: patch.linkedWallets ?? acc.profile.linkedWallets,
   };
   acc.profile = next;
+  persistAccountsState();
   return structuredClone(next);
 }
 
@@ -182,6 +229,7 @@ export async function linkWalletForAccount(handle: string, address: Address, mes
   const set = new Set(acc.profile.linkedWallets.map((a) => a.toLowerCase()));
   set.add(address.toLowerCase());
   acc.profile.linkedWallets = [...set];
+  persistAccountsState();
   return getPublicProfile(handle)!;
 }
 

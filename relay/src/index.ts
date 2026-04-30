@@ -11,6 +11,7 @@ import {
   linkWalletForAccount,
   linkWalletMessage,
   login,
+  normalizeHandle,
   registerAccount,
   resolveSession,
   updateProfile,
@@ -263,11 +264,16 @@ app.post("/v1/accounts/login", (req, res) => {
     if (typeof handle !== "string" || typeof password !== "string") {
       return res.status(400).json({ error: "invalid_body" });
     }
+    const normalized = normalizeHandle(handle);
+    if (!normalized) return res.status(400).json({ error: "invalid_handle" });
     const token = login(handle, password);
-    const prof = getPublicProfile(handle);
+    const prof = getPublicProfile(normalized);
+    if (!prof) return res.status(500).json({ error: "profile_missing" });
     return res.json({ token, profile: prof });
-  } catch {
-    return res.status(401).json({ error: "invalid_credentials" });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "invalid_credentials";
+    if (msg === "invalid_handle") return res.status(400).json({ error: msg });
+    return res.status(401).json({ error: msg });
   }
 });
 

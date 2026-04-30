@@ -31,8 +31,14 @@ export async function apiLogin(handle: string, password: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ handle, password }),
   });
-  if (!r.ok) throw new Error("invalid_credentials");
-  return r.json() as Promise<{ token: string; profile: AccountProfile | null }>;
+  if (!r.ok) {
+    const j = (await r.json().catch(() => null)) as { error?: string } | null;
+    const code = j?.error;
+    if (code === "invalid_handle") throw new Error("invalid_handle");
+    if (code === "invalid_body") throw new Error("invalid_body");
+    throw new Error(code ?? "invalid_credentials");
+  }
+  return r.json() as Promise<{ token: string; profile: AccountProfile }>;
 }
 
 export async function apiMe(token: string) {

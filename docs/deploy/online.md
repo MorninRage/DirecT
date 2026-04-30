@@ -2,7 +2,7 @@
 
 This guide wires the **relay API** (Node/Express on [Fly.io](https://fly.io/docs/)) and the **web app** (Vite/React on [Netlify](https://docs.netlify.com/)) so anyone can use the site over HTTPS.
 
-> **Reality check (MVP):** The relay keeps **accounts, posts, and media in memory**. A Fly **machine restart** or **new deploy** **wipes** that data unless you add a database or volume later. That is fine for demos; plan persistence before marketing “permanent” profiles.
+> **Persistence:** **Accounts and login sessions** are stored under **`DATA_DIR`** (Fly: **`/data`** volume **`morninrage_direct_relay_data`**). Cold starts and redeploys keep sign-ups and tokens. **Posts, feed, and media** are still **in-memory** on the relay; treat them as ephemeral until you add a database or object storage.
 
 ---
 
@@ -11,10 +11,10 @@ This guide wires the **relay API** (Node/Express on [Fly.io](https://fly.io/docs
 | Area | Status |
 |------|--------|
 | Web: auth, profiles, feed, My page, settings, notifications (client + relay) | **Working** against a running relay |
-| Relay: signed events, feed, metrics, media, accounts API | **Working** (in-memory) |
+| Relay: signed events, feed, metrics, media, accounts API | Accounts/sessions **persist on disk** (Fly volume); events/media **in-memory** |
 | Chain verification `CHAIN_ID` on relay | Configurable via env (`84532` Base Sepolia default) |
 | Contracts: DIR + EmissionsController | **In repo**; **not required** for read/post MVP if you only exercise relay + wallets |
-| Production persistence (Postgres/S3) | **Not** in repo |
+| Production DB / blob storage for posts & media | **Not** in repo |
 | Merkle payouts / emissions oracle wired to web | **Stub / testnet path** per [`mvp-scope.md`](../mvp-scope.md) |
 
 **“Fully works online”** for the current codebase means: **Netlify URL** loads the SPA, **Fly URL** serves `/v1/*`, and the SPA’s **`VITE_RELAY_URL`** points at Fly. Wallets still talk to **`VITE_RPC_URL`** on Base Sepolia (or whatever L2 you configure).
@@ -52,7 +52,19 @@ fly launch
 - The repo defaults to app name **`morninrage-direct-relay`** in [`relay/fly.toml`](../../relay/fly.toml). If that name is taken globally, pick another and update **`netlify.toml`** `VITE_RELAY_URL` to match.
 - Region: **`iad`** in repo config; change in `fly.toml` if you prefer another region.
 - **Overwrite** `fly.toml` if prompted, or merge carefully — this repo already includes `relay/fly.toml` tuned for `internal_port = 8080` and `/health` checks.
-- **Do not** add Postgres for the minimal MVP unless you plan to implement persistence.
+- **Do not** add Postgres for the minimal MVP unless you plan to implement feed/media persistence.
+
+### Account storage volume (required for production logins)
+
+`relay/fly.toml` mounts a [**Fly volume**](https://fly.io/docs/reference/volumes/) at **`/data`**. Create it once per app (same **region** as the app, e.g. `iad`):
+
+```bash
+fly volumes list -a morninrage-direct-relay
+# If no volume named morninrage_direct_relay_data:
+fly volumes create morninrage_direct_relay_data --region iad --size 1 -a morninrage-direct-relay
+```
+
+Then deploy. **Scale this app to a single machine** per region while using one volume (or use LiteFS / external DB for multi-instance).
 
 Set secrets (optional but recommended):
 
@@ -82,7 +94,8 @@ You should see JSON with `"ok": true`.
 
 | Variable | Purpose |
 |----------|---------|
-| `PORT` | Set to **8080** in this repo’s `fly.toml` `[env]` — must match `internal_port`. |
+| `PORT` | **8080** in production (`relay/fly.toml` `[env]`). Fly’s proxy targets `internal_port`; without `PORT`, the server defaulted to **8787** and health checks failed. Local dev: **8787** via `.env`. |
+| `DATA_DIR` | **`/data`** in the container (Fly volume). Local dev: `relay/data/` via default. |
 | `CHAIN_ID` | EIP-712 verification chain id (default **84532** Base Sepolia). |
 | `INDEXER_SECRET` | If set, protects indexer-style `POST /v1/events/:eid/view` per relay code. |
 
@@ -154,7 +167,8 @@ The relay uses `cors()` wide open — acceptable for early demos. Before mainnet
 | Web loads but “network error” on login | Wrong `VITE_RELAY_URL`, relay down, or mixed content (http relay from https site — use https Fly URL). |
 | Signature / chain errors | `CHAIN_ID` mismatch between relay and `VITE_CHAIN_ID`, or wallet on wrong network. |
 | 404 on refresh deep link | Netlify SPA redirect missing — check `netlify.toml`. |
-| Data disappeared | Relay restarted — in-memory state lost; expected for MVP. |
+| `invalid_credentials` after a correct password | Relay had no volume / cold machine with empty memory; accounts file missing. Create Fly volume, redeploy, **or** re-register. With volume + `DATA_DIR=/data`, accounts survive restarts. |
+| Feed or posts “reset” after a while | Posts and media are **still in-memory** on the relay; only **accounts/sessions** persist. Expected until you add DB/storage. |
 
 ---
 

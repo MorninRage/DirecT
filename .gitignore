@@ -7,6 +7,7 @@ out/
 .env
 *.log
 .DS_Store
+relay/data/
 
 # Local Netlify folder
 .netlify

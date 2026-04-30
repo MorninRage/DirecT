@@ -17,14 +17,14 @@ export function SettingsPage() {
   useEffect(() => {
     if (!profile) return;
     const d = structuredClone(profile);
-    d.settings = {
+    const defaults = {
       compactFeed: false,
       showMetricsInline: true,
       highContrast: false,
       reduceMotion: false,
       communityFeedUnlocked: false,
-      ...d.settings,
     };
+    d.settings = { ...defaults, ...d.settings };
     setDraft(d);
   }, [profile]);
 

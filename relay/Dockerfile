@@ -10,9 +10,11 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+ENV DATA_DIR=/data
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
-# Fly sets PORT to match fly.toml [http_service].internal_port
+RUN mkdir -p /data
+# Fly: mount volume at /data for account/session persistence across restarts.
 EXPOSE 8080
 CMD ["node", "dist/index.js"]
