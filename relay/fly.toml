@@ -1,0 +1,31 @@
+# DirecT relay API — https://fly.io/docs
+# GitHub: MorninRage/DirecT — deploy from relay/:  fly launch (first time)  then  fly deploy
+#
+# If this app name is taken globally, pick another and update netlify.toml VITE_RELAY_URL to match.
+# After first deploy:  fly secrets set CHAIN_ID=84532 INDEXER_SECRET=your-long-random-secret
+
+app = "morninrage-direct-relay"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

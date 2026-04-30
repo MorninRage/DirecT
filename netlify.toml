@@ -1,0 +1,28 @@
+# Netlify: DirecT web (Vite SPA under apps/web)
+# GitHub: https://github.com/MorninRage/DirecT — team / account: morninrage (match your other sites).
+#
+# Dashboard: create site name **DirecT** (slug often direct-morninrage or morninrage-direct — must be unique).
+# Import from Git → MorninRage/DirecT → Netlify reads this file at repo root.
+# CLI (after netlify login): from repo root run  netlify init  or  netlify link
+#
+# Relay URL must match relay/fly.toml app name (production):
+#   https://morninrage-direct-relay.fly.dev
+#
+# Optional overrides in the UI: VITE_TOKEN_ADDRESS, VITE_EMISSIONS_ADDRESS
+
+[build]
+  base = "apps/web"
+  command = "npm run build"
+  publish = "dist"
+
+# Single-page app: send all routes to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "22"
+  VITE_RELAY_URL = "https://morninrage-direct-relay.fly.dev"
+  VITE_CHAIN_ID = "84532"
+  VITE_RPC_URL = "https://sepolia.base.org"

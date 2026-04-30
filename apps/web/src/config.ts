@@ -1,0 +1,1 @@
+export const RELAY = import.meta.env.VITE_RELAY_URL ?? "http://127.0.0.1:8787";

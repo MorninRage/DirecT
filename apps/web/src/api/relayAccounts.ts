@@ -1,0 +1,94 @@
+import { RELAY } from "../config";
+import type { AccountProfile } from "../types/account";
+
+export const ACCOUNT_TOKEN_KEY = "direct_account_token";
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(ACCOUNT_TOKEN_KEY);
+}
+
+export function setStoredToken(token: string | null) {
+  if (token) localStorage.setItem(ACCOUNT_TOKEN_KEY, token);
+  else localStorage.removeItem(ACCOUNT_TOKEN_KEY);
+}
+
+export async function apiRegister(handle: string, password: string, displayName?: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ handle, password, displayName }),
+  });
+  if (!r.ok) {
+    const j = (await r.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(j?.error ?? (await r.text()));
+  }
+  return r.json() as Promise<{ token: string; profile: AccountProfile }>;
+}
+
+export async function apiLogin(handle: string, password: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ handle, password }),
+  });
+  if (!r.ok) throw new Error("invalid_credentials");
+  return r.json() as Promise<{ token: string; profile: AccountProfile | null }>;
+}
+
+export async function apiMe(token: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/me`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error("auth_failed");
+  return r.json() as Promise<AccountProfile>;
+}
+
+export async function apiPublicProfile(handle: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/public/${encodeURIComponent(handle)}`);
+  if (!r.ok) return null;
+  return r.json() as Promise<AccountProfile>;
+}
+
+export async function apiPatchProfile(token: string, patch: Partial<AccountProfile>) {
+  const r = await fetch(`${RELAY}/v1/accounts/me`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<AccountProfile>;
+}
+
+export async function apiLinkWalletChallenge(token: string) {
+  const r = await fetch(`${RELAY}/v1/link-wallet/challenge`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<{ message: string; timestamp: number }>;
+}
+
+export async function apiMeNotifications(token: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/me/notifications`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<{
+    items: Array<{
+      id: string;
+      kind: string;
+      postEid: string;
+      actor: string;
+      summary: string;
+      at: number;
+      directHandle: string | null;
+    }>;
+  }>;
+}
+
+export async function apiLinkWallet(token: string, address: string, message: string, signature: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/me/link-wallet`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ address, message, signature }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<AccountProfile>;
+}

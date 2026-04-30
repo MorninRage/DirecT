@@ -1,0 +1,186 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import type { Address } from "viem";
+import { useDirectAuth } from "../auth/DirectAuthProvider";
+import { RELAY } from "../config";
+import type { EventHeader } from "../eip712";
+import { submitEvent } from "../lib/submitEvent";
+import { ReactionStrip } from "./ReactionStrip";
+import type { Emotion } from "../reactions";
+
+export type FeedPost = {
+  eid: string;
+  timestamp: number;
+  author: string;
+  schema: string;
+  preview?: string;
+  media?: { cid?: string; mime?: string }[];
+  direct_handle?: string | null;
+};
+
+export type PostMetrics = {
+  views: number;
+  shares: number;
+  comments: number;
+  reactions: Record<string, number>;
+};
+
+type CommentRow = { eid: string; author: string; timestamp: number; text: string };
+
+export function PostCard({
+  post,
+  metrics,
+  onRefreshMetrics,
+  onFeedRefresh,
+}: {
+  post: FeedPost;
+  metrics?: PostMetrics;
+  onRefreshMetrics: () => void;
+  onFeedRefresh: () => void;
+}) {
+  const { address, signEnvelope } = useDirectAuth();
+  const [comments, setComments] = useState<CommentRow[]>([]);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+
+  const profilePath = post.direct_handle ? `/u/${post.direct_handle}` : `/direct/${post.author}`;
+
+  const loadComments = async () => {
+    const r = await fetch(`${RELAY}/v1/posts/${post.eid}/comments`);
+    if (r.ok) setComments(await r.json());
+  };
+
+  useEffect(() => {
+    if (showComments) void loadComments();
+  }, [showComments, post.eid]);
+
+  const sendChild = async (type: string, extra: Record<string, unknown>) => {
+    if (!address) throw new Error("Connect a signing wallet first.");
+    const body = {
+      type,
+      schema: `direct.${type}.v1`,
+      reply_to: post.eid,
+      created_at: new Date().toISOString(),
+      ...extra,
+    };
+    const header: EventHeader = {
+      author: address as Address,
+      schema: String(body.schema),
+      timestamp: Math.floor(Date.now() / 1000),
+      nonce: crypto.randomUUID(),
+      prev_eid: null,
+    };
+    const payload = await signEnvelope(header, body);
+    await submitEvent(payload);
+  };
+
+  const onReact = async (emotion: Emotion) => {
+    try {
+      await sendChild("reaction", { reaction: emotion });
+      await onRefreshMetrics();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onShare = async () => {
+    try {
+      await sendChild("share", { note: "reshare" });
+      await onRefreshMetrics();
+      await onFeedRefresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onView = async () => {
+    await fetch(`${RELAY}/v1/events/${post.eid}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: 1 }),
+    });
+    await onRefreshMetrics();
+  };
+
+  const onComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      await sendChild("comment", { text: commentText.trim() });
+      setCommentText("");
+      await loadComments();
+      await onRefreshMetrics();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const video = post.media?.find((m) => m.mime?.startsWith("video/") && m.cid);
+  const summary = metrics
+    ? Object.entries(metrics.reactions)
+        .filter(([, n]) => n > 0)
+        .map(([k, n]) => `${k}:${n}`)
+        .join(" · ")
+    : null;
+
+  return (
+    <article className="hud-post">
+      <div className="hud-post-meta">
+        <Link className="hud-link" to={profilePath}>
+          {post.direct_handle ? `@${post.direct_handle}` : `${post.author.slice(0, 6)}…${post.author.slice(-4)}`}
+        </Link>
+        <span>{new Date(post.timestamp * 1000).toLocaleString()}</span>
+      </div>
+      <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap" }}>{post.preview}</p>
+      {video?.cid ? (
+        <video className="hud-video" controls src={`${RELAY}/v1/media/${video.cid}`} />
+      ) : null}
+      {metrics ? (
+        <div className="hud-post-metrics hud-mono" style={{ marginTop: 10, fontSize: 11, color: "var(--hud-dim)" }}>
+          views {metrics.views} · shares {metrics.shares} · comments {metrics.comments}
+          {summary ? <> · {summary}</> : null}
+        </div>
+      ) : null}
+
+      <div className="hud-label" style={{ marginTop: 10 }}>
+        Impressions
+      </div>
+      <ReactionStrip disabled={!address} onReact={(e) => void onReact(e)} />
+
+      <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <button type="button" className="hud-btn" disabled={!address} onClick={() => void onView()}>
+          Register view
+        </button>
+        <button type="button" className="hud-btn hud-btn--primary" disabled={!address} onClick={() => void onShare()}>
+          Reshare
+        </button>
+        <button type="button" className="hud-btn" onClick={() => void onRefreshMetrics()}>
+          Scan metrics
+        </button>
+        <button type="button" className="hud-btn" onClick={() => setShowComments((v) => !v)}>
+          {showComments ? "Hide comments" : "Comments"}
+        </button>
+      </div>
+
+      {showComments ? (
+        <div style={{ marginTop: 10 }}>
+          <ul style={{ listStyle: "none", padding: 0, margin: "0 0 10px", display: "grid", gap: 8 }}>
+            {comments.map((c) => (
+              <li key={c.eid} className="hud-mono" style={{ fontSize: 12, borderLeft: "2px solid rgba(126,203,255,0.35)", paddingLeft: 8 }}>
+                <div style={{ color: "var(--hud-dim)" }}>
+                  {c.author.slice(0, 6)}… · {new Date(c.timestamp * 1000).toLocaleString()}
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{c.text}</div>
+              </li>
+            ))}
+          </ul>
+          <textarea className="hud-textarea" style={{ minHeight: 72 }} value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment…" />
+          <div style={{ marginTop: 8 }}>
+            <button type="button" className="hud-btn hud-btn--primary" disabled={!address || !commentText.trim()} onClick={() => void onComment()}>
+              Post comment
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </article>
+  );
+}
