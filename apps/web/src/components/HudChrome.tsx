@@ -109,7 +109,7 @@ export function HudChrome({ children }: { children: ReactNode }) {
         </div>
       </header>
       <OpenWalletHubContext.Provider value={() => setOpen(true)}>
-        <main className="hud-shell">{children}</main>
+        <main className={/^\/u\/[^/]+$/.test(loc.pathname) ? "hud-shell hud-shell--fullbleed" : "hud-shell"}>{children}</main>
       </OpenWalletHubContext.Provider>
       <AccessHub open={open} onClose={() => setOpen(false)} />
       <div style={{ position: "fixed", bottom: 8, right: 12, fontSize: 10, color: "var(--hud-dim)", zIndex: 40 }}>

@@ -102,6 +102,16 @@ body {
   margin: 0 auto;
 }
 
+/* User home (/u/:handle): full viewport width for draggable grid canvas */
+.hud-shell--fullbleed {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
 .hud-topbar {
   position: fixed;
   top: 0;
@@ -493,10 +503,16 @@ body.hud-post-metrics-hidden .hud-post-metrics {
   color: rgba(200, 220, 255, 0.85);
 }
 
-/* --- Homepage (user grid) --- */
+/* --- Homepage (user grid) — use full shell width (see .hud-shell--fullbleed) --- */
 .hud-home {
-  max-width: 940px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.hud-home-layout {
+  width: 100%;
+  min-width: 0;
 }
 
 .hud-panel--hint {

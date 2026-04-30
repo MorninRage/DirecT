@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import GridLayout, { type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -44,7 +44,9 @@ export function UserHomePage() {
   const [profileMissing, setProfileMissing] = useState(false);
   const [feed, setFeed] = useState<FeedPost[]>([]);
   const [metrics, setMetrics] = useState<Record<string, PostMetrics | undefined>>({});
-  const [width, setWidth] = useState(900);
+  const [width, setWidth] = useState(() =>
+    typeof window !== "undefined" ? Math.max(320, window.innerWidth - 32) : 1200,
+  );
   /** Controlled grid positions — updated on every drag/resize so tiles stay put and peers reflow live. */
   const [gridLayout, setGridLayout] = useState<Layout[] | null>(null);
   const saveT = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,13 +64,21 @@ export function UserHomePage() {
     setGridLayout((prev) => (prev === null ? profileToGridLayout(pub) : prev));
   }, [pub, h, isOwner]);
 
-  useEffect(() => {
-    const ro = () => setWidth(Math.min(920, Math.max(320, window.innerWidth - 40)));
-    ro();
-    window.addEventListener("resize", ro);
-    return () => window.removeEventListener("resize", ro);
-  }, []);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
+  useLayoutEffect(() => {
+    if (!pub) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.getBoundingClientRect().width;
+      setWidth(Math.max(280, Math.floor(w)));
+    };
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [pub]);
   useEffect(() => {
     void (async () => {
       if (!h) return;
@@ -149,13 +159,14 @@ export function UserHomePage() {
   if (!pub) return <div className="hud-panel">Loading…</div>;
 
   return (
-    <div className="hud-home">
+    <div ref={containerRef} className="hud-home hud-home-layout">
       {isOwner ? (
         <div className="hud-home-hint hud-panel hud-panel--hint">
           <div className="hud-home-hint__title">Arrange your page</div>
           <p className="hud-home-hint__text">
-            Grab the <strong>colored tile bar</strong> to move blocks — others slide aside automatically. Drag corners or
-            edges to resize. Layout is saved to your profile.
+            The grid uses the <strong>full width of your window</strong> — you can dock tiles to the far left or right.
+            Grab the <strong>colored tile bar</strong> to move blocks (others reflow). Drag corners or edges to resize.
+            Layout is saved to your profile.
           </p>
         </div>
       ) : null}
