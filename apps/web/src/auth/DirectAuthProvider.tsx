@@ -39,6 +39,8 @@ export type DirectAuthState = {
   error: string | null;
   setError: (e: string | null) => void;
   signEnvelope: (header: EventHeader, body: Record<string, unknown>) => Promise<SignedPayload>;
+  /** Sign a plain UTF-8 string (e.g. link-wallet challenge). Works for extension + embedded local key. */
+  signUtf8Message: (message: string) => Promise<Hex>;
   createLocalWallet: () => Promise<Hex>;
   /** Restore session from a saved 32-byte hex private key (with or without 0x). */
   importLocalWallet: (rawPrivateKey: string) => Promise<void>;
@@ -102,6 +104,19 @@ export function DirectAuthProvider({ children }: { children: ReactNode }) {
     [domainChainId, localAccount, walletClient, wagmiAddress],
   );
 
+  const signUtf8Message = useCallback(
+    async (message: string): Promise<Hex> => {
+      if (localAccount) {
+        return localAccount.signMessage({ message });
+      }
+      if (walletClient && wagmiAddress) {
+        return walletClient.signMessage({ account: wagmiAddress, message });
+      }
+      throw new Error("No signing wallet — open Wallet in the top bar and connect or create a key.");
+    },
+    [localAccount, walletClient, wagmiAddress],
+  );
+
   const createLocalWallet = useCallback(async (): Promise<Hex> => {
     try {
       await disconnectAsync();
@@ -141,11 +156,12 @@ export function DirectAuthProvider({ children }: { children: ReactNode }) {
         error,
         setError,
         signEnvelope,
+        signUtf8Message,
         createLocalWallet,
         importLocalWallet,
         clearLocalWallet,
       }) satisfies DirectAuthState,
-    [mode, address, domainChainId, ready, error, signEnvelope, createLocalWallet, importLocalWallet, clearLocalWallet],
+    [mode, address, domainChainId, ready, error, signEnvelope, signUtf8Message, createLocalWallet, importLocalWallet, clearLocalWallet],
   );
 
   return <DirectAuthContext.Provider value={value}>{children}</DirectAuthContext.Provider>;

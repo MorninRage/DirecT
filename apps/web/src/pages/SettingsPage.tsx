@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useWalletClient, useAccount } from "wagmi";
+import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { useAccountProfile } from "../auth/AccountProvider";
 import { apiLinkWallet, apiLinkWalletChallenge, apiPatchProfile } from "../api/relayAccounts";
 import type { AccountProfile } from "../types/account";
+import { useOpenWalletHub } from "../components/walletHubContext";
 
 const LINK_KEYS = ["website", "twitter", "x", "instagram", "github", "youtube", "linkedin", "tiktok"] as const;
 
 export function SettingsPage() {
   const { token, profile, refresh, logout } = useAccountProfile();
-  const { address } = useAccount();
-  const { data: walletClient } = useWalletClient();
+  const { address, mode, signUtf8Message } = useDirectAuth();
+  const openWalletHub = useOpenWalletHub();
   const [draft, setDraft] = useState<AccountProfile | null>(null);
   const [status, setStatus] = useState("");
 
@@ -61,14 +62,14 @@ export function SettingsPage() {
   };
 
   const linkWallet = async () => {
-    if (!walletClient || !address) {
-      setStatus("Connect a wallet first (Account → Signing).");
+    if (!address) {
+      setStatus("Set up a signing wallet first (button below).");
       return;
     }
     setStatus("Linking wallet…");
     try {
       const { message } = await apiLinkWalletChallenge(token);
-      const signature = await walletClient.signMessage({ account: address, message });
+      const signature = await signUtf8Message(message);
       await apiLinkWallet(token, address, message, signature);
       await refresh();
       setDraft((d) => (d ? { ...d, linkedWallets: [...new Set([...d.linkedWallets, address.toLowerCase()])] } : d));
@@ -187,12 +188,20 @@ export function SettingsPage() {
         <div className="hud-label">Signing wallet linkage</div>
         <p style={{ color: "var(--hud-dim)", marginTop: 0, lineHeight: 1.55 }}>
           Link the address you use to sign posts. Required if you want posts to carry <strong>@{profile.handle}</strong> and pass relay checks.
+          Use the top bar <strong>Wallet</strong> button to connect MetaMask / Coinbase or generate an embedded signing key (session-only).
         </p>
-        <div className="hud-mono" style={{ marginBottom: 10 }}>Connected: {address ?? "none"}</div>
+        <div className="hud-mono" style={{ marginBottom: 10 }}>
+          Signing address: {address ?? "none"} {address ? `(${mode})` : null}
+        </div>
         <div className="hud-mono" style={{ marginBottom: 10 }}>
           Linked: {profile.linkedWallets.length ? profile.linkedWallets.join(", ") : "none"}
         </div>
-        <button type="button" className="hud-btn hud-btn--primary" onClick={() => void linkWallet()} disabled={!address || !walletClient}>
+        {!address ? (
+          <button type="button" className="hud-btn hud-btn--primary" style={{ marginBottom: 10 }} onClick={() => openWalletHub()}>
+            Connect or create signing wallet…
+          </button>
+        ) : null}
+        <button type="button" className="hud-btn hud-btn--primary" onClick={() => void linkWallet()} disabled={!address}>
           Sign message & link wallet
         </button>
       </section>

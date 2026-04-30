@@ -6,6 +6,7 @@ import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { useAccountProfile } from "../auth/AccountProvider";
 import { AccessHub } from "./AccessHub";
 import { NotificationBell } from "./NotificationBell";
+import { OpenWalletHubContext } from "./walletHubContext";
 
 export function HudChrome({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -107,7 +108,9 @@ export function HudChrome({ children }: { children: ReactNode }) {
           )}
         </div>
       </header>
-      <main className="hud-shell">{children}</main>
+      <OpenWalletHubContext.Provider value={() => setOpen(true)}>
+        <main className="hud-shell">{children}</main>
+      </OpenWalletHubContext.Provider>
       <AccessHub open={open} onClose={() => setOpen(false)} />
       <div style={{ position: "fixed", bottom: 8, right: 12, fontSize: 10, color: "var(--hud-dim)", zIndex: 40 }}>
         {profile ? (
