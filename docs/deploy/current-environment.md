@@ -59,6 +59,8 @@ curl -fsS -X POST "https://morninrage-direct-relay.fly.dev/v1/admin/rewards-epoc
 
 After a `201`, reload **Rewards**: eligible users (wallets in **`allocations`**) see amounts and can **`claim`** if the root is active on-chain and the pool is funded.
 
+**Step-by-step (including “who runs what” for users vs operators):** [first-epoch-cookbook.md](first-epoch-cookbook.md)
+
 ## Automation (`contracts/`)
 
 | Script | Purpose |

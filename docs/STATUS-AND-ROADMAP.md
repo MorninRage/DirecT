@@ -190,6 +190,7 @@ Below is a **prioritized backlog** derived from the original phase plan and gaps
 | Document | Use when you need… |
 |----------|---------------------|
 | [mvp-scope.md](mvp-scope.md) | Milestone table, M3 checklist, environment variables. |
+| [deploy/first-epoch-cookbook.md](deploy/first-epoch-cookbook.md) | **First payout:** exact commands; operators vs normal users. |
 | [deploy/current-environment.md](deploy/current-environment.md) | Live URLs, contract table, **M3 runbook**, Netlify env. |
 | [protocol/README.md](protocol/README.md) | REST routes, snapshot + epoch ingest, wire formats. |
 | [security/threat-model.md](security/threat-model.md) | Adversary model; Sybil/oracle/governance threats (mostly forward-looking). |

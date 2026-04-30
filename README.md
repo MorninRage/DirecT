@@ -62,6 +62,7 @@ See [`contracts/README.md`](contracts/README.md) for `gen:deployer`, `deploy:bas
 
 - [Status & roadmap (capabilities + what’s next)](docs/STATUS-AND-ROADMAP.md)
 - [GitHub: CI + linking Netlify/Fly](.github/README.md)
+- [First epoch cookbook (copy-paste operator steps)](docs/deploy/first-epoch-cookbook.md)  
 - [Current environment (live URLs + contracts)](docs/deploy/current-environment.md)  
 - [Deploy online — Fly + Netlify](docs/deploy/online.md)  
 - [Settlement decision (L2-first)](docs/architecture/settlement-decision.md)  

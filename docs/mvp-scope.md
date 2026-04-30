@@ -51,7 +51,7 @@
 4. `POST /v1/admin/rewards-epochs` with body matching the artifact (see [protocol/README.md](protocol/README.md)).
 5. Open web **Rewards** with a wallet that matches an allocation; claim on Base Sepolia.
 
-## Environment
+**Detailed cookbook:** [deploy/first-epoch-cookbook.md](deploy/first-epoch-cookbook.md)
 
 - **Node 22+** (Netlify / local); **npm** (repo uses npm in `contracts/`, `relay/`, `apps/web/`).
 - **Primary contracts toolchain:** **Hardhat** (Windows-friendly); Foundry optional.
