@@ -12,10 +12,71 @@
   --hud-glow: 0 0 24px rgba(100, 190, 255, 0.18);
   --hud-rim: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   --hud-radius: 14px;
+  /* Custom scrollbars — ice glow, brass rim harmony */
+  --hud-scroll-size: 11px;
+  --hud-scroll-track: rgba(8, 12, 20, 0.82);
+  --hud-scroll-track-edge: rgba(100, 150, 190, 0.14);
+  --hud-scroll-thumb-top: rgba(160, 215, 255, 0.7);
+  --hud-scroll-thumb-mid: rgba(90, 150, 210, 0.55);
+  --hud-scroll-thumb-bottom: rgba(50, 85, 130, 0.65);
+  --hud-scroll-thumb-ring: rgba(230, 245, 255, 0.38);
+  --hud-scroll-thumb-glow: 0 0 18px rgba(126, 203, 255, 0.55), 0 0 36px rgba(100, 180, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  --hud-scroll-thumb-glow-hover: 0 0 24px rgba(154, 220, 255, 0.75), 0 0 40px rgba(126, 203, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hud-scroll-thumb-mid) var(--hud-scroll-track);
+}
+
+/* -------- Custom scrollbars (WebKit) — matches HUD metal / ice glow -------- */
+*::-webkit-scrollbar {
+  width: var(--hud-scroll-size);
+  height: var(--hud-scroll-size);
+}
+
+*::-webkit-scrollbar-track {
+  margin: 5px;
+  background: linear-gradient(180deg, rgba(14, 20, 30, 0.92), rgba(6, 10, 16, 0.88));
+  border-radius: 999px;
+  border: 1px solid var(--hud-scroll-track-edge);
+  box-shadow:
+    inset 0 0 14px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 1px solid var(--hud-scroll-thumb-ring);
+  background: linear-gradient(
+    180deg,
+    var(--hud-scroll-thumb-top),
+    var(--hud-scroll-thumb-mid) 45%,
+    var(--hud-scroll-thumb-bottom)
+  );
+  box-shadow: var(--hud-scroll-thumb-glow);
+  background-clip: padding-box;
+  transition: box-shadow 0.22s ease, border-color 0.22s ease, filter 0.22s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  border-color: rgba(255, 250, 235, 0.45);
+  box-shadow: var(--hud-scroll-thumb-glow-hover);
+  filter: brightness(1.08);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  filter: brightness(1.12);
+  box-shadow:
+    0 0 16px rgba(126, 203, 255, 0.5),
+    inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 html,
@@ -157,6 +218,7 @@ body {
   resize: vertical;
   min-height: 96px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+  scrollbar-gutter: stable;
 }
 
 .hud-input {
@@ -369,6 +431,11 @@ body.hud-compact-feed .hud-post {
 body.hud-high-contrast {
   --hud-text: #f4f8ff;
   --hud-dim: rgba(220, 235, 255, 0.72);
+  --hud-scroll-track: rgba(4, 8, 16, 0.92);
+  --hud-scroll-thumb-top: rgba(200, 235, 255, 0.88);
+  --hud-scroll-thumb-mid: rgba(120, 190, 255, 0.75);
+  --hud-scroll-thumb-bottom: rgba(70, 120, 180, 0.8);
+  --hud-scroll-thumb-ring: rgba(255, 255, 255, 0.5);
 }
 
 body.hud-high-contrast .hud-panel,
@@ -376,10 +443,10 @@ body.hud-high-contrast .hud-post {
   border-color: rgba(200, 220, 255, 0.35);
 }
 
-body.hud-reduce-motion * {
+body.hud-reduce-motion *,
+body.hud-reduce-motion *::-webkit-scrollbar-thumb {
   transition: none !important;
 }
-
 body.hud-post-metrics-hidden .hud-post-metrics {
   display: none;
 }
