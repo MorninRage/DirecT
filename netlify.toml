@@ -17,9 +17,10 @@
 # addresses (or run contracts npm run netlify:sync-token / ship:online). Redeploy after env changes.
 
 [build]
+  # base = package root; publish is relative to base (not repo root) — see Netlify monorepo + file-based config docs.
   base = "apps/web"
   command = "npm run build"
-  publish = "apps/web/dist"
+  publish = "dist"
 
 [[redirects]]
   from = "/*"

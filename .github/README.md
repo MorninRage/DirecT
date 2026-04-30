@@ -15,7 +15,7 @@ Fix failures locally before merging.
 ## Connecting Netlify to Git
 
 1. Netlify → **Add site** → **Import from Git** → choose **MorninRage/DirecT**.
-2. Netlify reads root [`netlify.toml`](../netlify.toml): base `apps/web`, publish `apps/web/dist`.
+2. Netlify reads root [`netlify.toml`](../netlify.toml): base `apps/web`, publish `dist` (relative to base → `apps/web/dist` on disk).
 3. Set build env vars per [`docs/deploy/current-environment.md`](../docs/deploy/current-environment.md).
 
 ## Fly.io

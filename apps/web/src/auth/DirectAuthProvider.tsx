@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Address, Hex } from "viem";
+import { createWalletClient, http, type Abi, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { useAccount, useChainId, useDisconnect, useWalletClient } from "wagmi";
 import { appChain } from "../chains";
@@ -45,6 +45,15 @@ export type DirectAuthState = {
   /** Restore session from a saved 32-byte hex private key (with or without 0x). */
   importLocalWallet: (rawPrivateKey: string) => Promise<void>;
   clearLocalWallet: () => void;
+  /**
+   * Broadcast a contract write using the embedded local key (session). Extension wallets should use wagmi instead.
+   */
+  broadcastWriteContract: (params: {
+    address: Address;
+    abi: Abi;
+    functionName: string;
+    args: readonly unknown[];
+  }) => Promise<Hex>;
 };
 
 const DirectAuthContext = createContext<DirectAuthState | null>(null);
@@ -144,6 +153,33 @@ export function DirectAuthProvider({ children }: { children: ReactNode }) {
     setLocalPk(null);
   }, []);
 
+  const broadcastWriteContract = useCallback(
+    async (params: {
+      address: Address;
+      abi: Abi;
+      functionName: string;
+      args: readonly unknown[];
+    }): Promise<Hex> => {
+      if (!localAccount) {
+        throw new Error("Embedded wallet not active — use Wallet → MetaMask/Coinbase to claim, or create/import an embedded key.");
+      }
+      const rpc = (import.meta.env.VITE_RPC_URL as string | undefined)?.trim();
+      if (!rpc) throw new Error("Missing VITE_RPC_URL — cannot broadcast transactions.");
+      const walletClient = createWalletClient({
+        account: localAccount,
+        chain: appChain,
+        transport: http(rpc),
+      });
+      return walletClient.writeContract({
+        address: params.address,
+        abi: params.abi,
+        functionName: params.functionName,
+        args: params.args,
+      });
+    },
+    [localAccount],
+  );
+
   const ready = status !== "connecting";
 
   const value = useMemo(
@@ -160,8 +196,21 @@ export function DirectAuthProvider({ children }: { children: ReactNode }) {
         createLocalWallet,
         importLocalWallet,
         clearLocalWallet,
+        broadcastWriteContract,
       }) satisfies DirectAuthState,
-    [mode, address, domainChainId, ready, error, signEnvelope, signUtf8Message, createLocalWallet, importLocalWallet, clearLocalWallet],
+    [
+      mode,
+      address,
+      domainChainId,
+      ready,
+      error,
+      signEnvelope,
+      signUtf8Message,
+      createLocalWallet,
+      importLocalWallet,
+      clearLocalWallet,
+      broadcastWriteContract,
+    ],
   );
 
   return <DirectAuthContext.Provider value={value}>{children}</DirectAuthContext.Provider>;

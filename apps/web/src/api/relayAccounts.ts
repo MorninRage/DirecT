@@ -128,6 +128,24 @@ export async function apiLatestRewardEpoch(): Promise<PublishedRewardEpoch | nul
   return j.epoch ?? null;
 }
 
+/** Gasless claim: relay submits claim() using RELAYER_PRIVATE_KEY on Fly. DIR still goes to beneficiary. */
+export async function apiSponsoredClaim(token: string, beneficiary?: string): Promise<{ txHash: string }> {
+  const r = await fetch(`${RELAY}/v1/rewards/sponsored-claim`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(beneficiary ? { beneficiary } : {}),
+  });
+  const j = (await r.json().catch(() => ({}))) as { error?: string; detail?: string; txHash?: string };
+  if (!r.ok) {
+    throw new Error(j.detail ? `${j.error ?? "request_failed"}: ${j.detail}` : (j.error ?? (await r.text())));
+  }
+  if (!j.txHash) throw new Error("no_tx_hash");
+  return { txHash: j.txHash };
+}
+
 export async function apiRewardsMe(token: string): Promise<RewardsMeResponse> {
   const r = await fetch(`${RELAY}/v1/rewards/me`, {
     headers: { Authorization: `Bearer ${token}` },

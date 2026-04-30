@@ -7,6 +7,9 @@
 # Secrets (set via fly secrets set — never commit):
 #   CHAIN_ID=84532
 #   INDEXER_SECRET=<random>  — gates GET /v1/indexer/snapshot, POST /v1/admin/rewards-epochs, etc.
+#   RELAYER_PRIVATE_KEY=0x… — signs gasless POST /v1/rewards/sponsored-claim (fund with Base Sepolia ETH)
+#   EMISSIONS_ADDRESS=0x…   — EmissionsController (must match web VITE_EMISSIONS_ADDRESS)
+# Optional: BASE_SEPOLIA_RPC_URL — defaults to https://sepolia.base.org
 #
 # Docs: docs/deploy/online.md, docs/deploy/current-environment.md
 

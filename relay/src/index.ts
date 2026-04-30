@@ -1,7 +1,7 @@
 import cors from "cors";
 import express from "express";
 import multer from "multer";
-import { keccak256, type Address, type Hex } from "viem";
+import { formatEther, keccak256, type Address, type Hex } from "viem";
 import type { SignedEvent } from "./crypto.js";
 import { verifySignature, computeEid } from "./crypto.js";
 import { isReactionKind, REACTION_KINDS, type ReactionKind } from "./reactionKinds.js";
@@ -30,11 +30,25 @@ import {
   schedulePersistEvents,
 } from "./persistEvents.js";
 import { addPublishedRewardEpoch, getLatestRewardEpoch, loadRewardEpochs, type PublishedRewardEpoch } from "./rewardsEpochs.js";
+import {
+  assertRootActiveAndNotClaimed,
+  loadSponsoredClaimConfig,
+  pickBeneficiaryForClaim,
+  submitSponsoredClaim,
+} from "./sponsoredClaim.js";
 import { listRecentFollowsForTarget } from "./followActivity.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? 84532);
 const INDEXER_SECRET = process.env.INDEXER_SECRET ?? "";
+
+function dirHumanLabel(amountWei: string): string {
+  try {
+    return `${formatEther(BigInt(amountWei))} DIR`;
+  } catch {
+    return `${amountWei} wei (invalid amount)`;
+  }
+}
 
 type Reactions = Record<ReactionKind, number>;
 
@@ -72,8 +86,14 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "4mb" }));
 
+
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "direct-relay", chainId: CHAIN_ID });
+  res.json({
+    ok: true,
+    service: "direct-relay",
+    chainId: CHAIN_ID,
+    sponsoredClaim: Boolean(loadSponsoredClaimConfig()),
+  });
 });
 
 const events = new Map<string, SignedEvent>();
@@ -534,6 +554,49 @@ app.get("/v1/rewards/me", (req, res) => {
   return res.json({ eligible: false, epoch: { id: ep.id, root: ep.root, chainId: ep.chainId } });
 });
 
+app.post("/v1/rewards/sponsored-claim", async (req, res) => {
+  const handle = requireAuth(req, res);
+  if (!handle) return;
+  const cfg = loadSponsoredClaimConfig();
+  if (!cfg) return res.status(503).json({ error: "sponsored_claim_disabled" });
+
+  const ep = getLatestRewardEpoch();
+  if (!ep || ep.chainId !== CHAIN_ID) return res.status(400).json({ error: "no_epoch" });
+
+  const prof = getPublicProfile(handle);
+  if (!prof) return res.status(404).json({ error: "not_found" });
+
+  const beneficiaryOpt =
+    typeof (req.body as { beneficiary?: unknown } | undefined)?.beneficiary === "string"
+      ? (req.body as { beneficiary: string }).beneficiary
+      : undefined;
+
+  try {
+    const { beneficiary, amount, proof } = pickBeneficiaryForClaim(ep, prof, beneficiaryOpt);
+    await assertRootActiveAndNotClaimed(cfg, ep.root as `0x${string}`, beneficiary, amount);
+    const txHash = await submitSponsoredClaim({
+      cfg,
+      root: ep.root as `0x${string}`,
+      beneficiary,
+      amount,
+      proof,
+    });
+    return res.json({ ok: true, txHash });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "not_eligible") return res.status(400).json({ error: "not_eligible" });
+    if (msg === "beneficiary_not_in_epoch_for_profile") {
+      return res.status(400).json({ error: "beneficiary_not_in_epoch_for_profile" });
+    }
+    if (msg === "root_mismatch") return res.status(500).json({ error: "epoch_corrupt" });
+    if (msg === "root_inactive") return res.status(400).json({ error: "root_inactive" });
+    if (msg === "already_claimed") return res.status(409).json({ error: "already_claimed" });
+    // eslint-disable-next-line no-console
+    console.error("[relay] sponsored-claim failed:", e);
+    return res.status(500).json({ error: "send_failed", detail: msg.slice(0, 200) });
+  }
+});
+
 app.post("/v1/admin/rewards-epochs", (req, res) => {
   if (!requireIndexer(req, res)) return;
   try {
@@ -670,7 +733,7 @@ app.get("/v1/accounts/me/notifications", (req, res) => {
           kind: "rewards_claimable",
           postEid: latest.id,
           actor: "",
-          summary: `Rewards epoch ${latest.id}: you can claim ${row.amountWei} wei DIR — open Rewards`,
+          summary: `Rewards epoch ${latest.id}: you can claim ${dirHumanLabel(row.amountWei)} — open Rewards`,
           at: Math.floor(latest.publishedAtMs / 1000),
           directHandle: null,
         });
@@ -687,7 +750,7 @@ app.get("/v1/accounts/me/notifications", (req, res) => {
             kind: "rewards_claimable",
             postEid: latest.id,
             actor: "",
-            summary: `Rewards epoch ${latest.id}: payout address can claim ${row.amountWei} wei DIR`,
+            summary: `Rewards epoch ${latest.id}: payout address can claim ${dirHumanLabel(row.amountWei)}`,
             at: Math.floor(latest.publishedAtMs / 1000),
             directHandle: null,
           });

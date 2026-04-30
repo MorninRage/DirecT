@@ -122,7 +122,7 @@ You should see JSON with `"ok": true`.
 3. Netlify reads **root** [`netlify.toml`](../../netlify.toml):
    - **Base directory:** `apps/web` (set via `base`)
    - **Build command:** `npm run build`
-   - **Publish directory:** `apps/web/dist` (relative to **repository root**; required when using `base`)
+   - **Publish directory:** `dist` (relative to **base** `apps/web`; Netlify deploys `apps/web/dist`)
 
 ### Build environment variables (required)
 
