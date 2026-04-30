@@ -438,7 +438,8 @@ app.get("/v1/accounts/me/notifications", (req, res) => {
   const myPostEids = new Set<string>();
   for (const [eid, env] of events) {
     const b = env.event.body as { type?: string; direct_handle?: string };
-    if (String(b.type ?? "") !== "post") continue;
+    const ty = String(b.type ?? "");
+    if (ty !== "post" && ty !== "repost") continue;
     const author = env.event.header.author.toLowerCase();
     const dh = String(b.direct_handle ?? "").toLowerCase();
     if (linked.has(author) || dh === prof.handle.toLowerCase()) {
@@ -461,16 +462,35 @@ app.get("/v1/accounts/me/notifications", (req, res) => {
     const b = env.event.body as {
       type?: string;
       reply_to?: string;
+      repost_of?: string;
       text?: string;
       reaction?: string;
     };
-    const rt = typeof b.reply_to === "string" ? b.reply_to.toLowerCase() : "";
-    if (!rt || !myPostEids.has(rt)) continue;
     const t = String(b.type ?? "");
-    if (t !== "comment" && t !== "reaction" && t !== "share") continue;
     const actor = env.event.header.author.toLowerCase();
     if (linked.has(actor)) continue;
 
+    if (t === "repost") {
+      const ro = typeof b.repost_of === "string" ? b.repost_of.toLowerCase() : "";
+      if (!ro || !myPostEids.has(ro)) continue;
+      const parent = events.get(ro);
+      const pb = parent?.event.body as { direct_handle?: string } | undefined;
+      const directHandle = pb?.direct_handle ? String(pb.direct_handle) : null;
+      items.push({
+        id: childEid.toLowerCase(),
+        kind: "repost",
+        postEid: ro,
+        actor: env.event.header.author,
+        summary: "Reshared your post",
+        at: env.event.header.timestamp,
+        directHandle,
+      });
+      continue;
+    }
+
+    const rt = typeof b.reply_to === "string" ? b.reply_to.toLowerCase() : "";
+    if (!rt || !myPostEids.has(rt)) continue;
+    if (t !== "comment" && t !== "reaction" && t !== "share") continue;
     const parent = events.get(rt);
     const pb = parent?.event.body as { direct_handle?: string } | undefined;
     const directHandle = pb?.direct_handle ? String(pb.direct_handle) : null;
@@ -484,7 +504,7 @@ app.get("/v1/accounts/me/notifications", (req, res) => {
       id: childEid.toLowerCase(),
       kind: t,
       postEid: rt,
-      actor,
+      actor: env.event.header.author,
       summary,
       at: env.event.header.timestamp,
       directHandle,

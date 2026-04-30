@@ -100,7 +100,7 @@ export function NotificationBell() {
             Activity on your posts
           </div>
           {items.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--hud-dim)" }}>No reactions or comments yet.</div>
+            <div style={{ fontSize: 13, color: "var(--hud-dim)" }}>No comments, reactions, or reshares yet.</div>
           ) : (
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
               {items.map((n) => (
