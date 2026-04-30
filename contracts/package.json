@@ -8,9 +8,15 @@
     "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
     "gen:deployer": "node scripts/generate-deployer-env.cjs",
     "deploy:base": "hardhat run scripts/deploy.ts --network baseSepolia",
-    "netlify:sync-token": "node scripts/sync-netlify-token-env.cjs"
+    "check:gas": "node scripts/check-deployer-gas.cjs",
+    "fund:cdp": "node scripts/fund-via-cdp.mjs",
+    "ship:online": "node scripts/ship-online.cjs",
+    "netlify:sync-token": "node scripts/sync-netlify-token-env.cjs",
+    "epoch:build": "node scripts/build-epoch.cjs",
+    "epoch:register": "hardhat run scripts/register-epoch-root.ts --network baseSepolia"
   },
   "devDependencies": {
+    "@coinbase/cdp-sdk": "^1.48.2",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/merkle-tree": "^1.0.7",
     "dotenv": "^17.4.2",

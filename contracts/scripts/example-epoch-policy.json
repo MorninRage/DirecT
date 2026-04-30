@@ -1,0 +1,13 @@
+{
+  "epochId": "m3-demo-1",
+  "chainId": 84532,
+  "weights": {
+    "reactions": 1,
+    "comments": 3,
+    "shares": 2
+  },
+  "perUserCapWei": "5000000000000000000000",
+  "poolWei": null,
+  "tokenAddress": "0xA02D4D759590ac737916F9Ba88c1AD338a514dCF",
+  "emissionsAddress": "0xD6FCCb66be9B28577a90A11D8A4b1Fd80a7e90a1"
+}

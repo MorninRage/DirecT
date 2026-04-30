@@ -1,6 +1,28 @@
 import { RELAY } from "../config";
 import type { AccountProfile } from "../types/account";
 
+export type PublishedRewardEpoch = {
+  id: string;
+  root: string;
+  chainId: number;
+  publishedAtMs: number;
+  registerTxHash?: string;
+  manifestUrl?: string;
+  allocations: Array<{ beneficiary: string; amountWei: string }>;
+};
+
+export type RewardsMeResponse =
+  | {
+      eligible: true;
+      epochId: string;
+      root: string;
+      beneficiary: string;
+      amountWei: string;
+      chainId: number;
+      allocations: PublishedRewardEpoch["allocations"];
+    }
+  | { eligible: false; epoch: { id: string; root: string; chainId: number } | null };
+
 export const ACCOUNT_TOKEN_KEY = "direct_account_token";
 
 export function getStoredToken(): string | null {
@@ -97,4 +119,50 @@ export async function apiLinkWallet(token: string, address: string, message: str
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json() as Promise<AccountProfile>;
+}
+
+export async function apiLatestRewardEpoch(): Promise<PublishedRewardEpoch | null> {
+  const r = await fetch(`${RELAY}/v1/rewards/epochs/latest`);
+  if (!r.ok) throw new Error(await r.text());
+  const j = (await r.json()) as { epoch: PublishedRewardEpoch | null };
+  return j.epoch ?? null;
+}
+
+export async function apiRewardsMe(token: string): Promise<RewardsMeResponse> {
+  const r = await fetch(`${RELAY}/v1/rewards/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<RewardsMeResponse>;
+}
+
+export async function apiFollow(token: string, handle: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/me/follow`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ handle }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<AccountProfile>;
+}
+
+export async function apiUnfollow(token: string, handle: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/me/follow/${encodeURIComponent(handle)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<AccountProfile>;
+}
+
+export async function apiFollowers(handle: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/${encodeURIComponent(handle)}/followers`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<{ handles: string[] }>;
+}
+
+export async function apiFollowingHandles(handle: string) {
+  const r = await fetch(`${RELAY}/v1/accounts/${encodeURIComponent(handle)}/following`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<{ handles: string[] }>;
 }

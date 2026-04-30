@@ -62,6 +62,11 @@ export function HudChrome({ children }: { children: ReactNode }) {
               Feed
             </Link>
           ) : null}
+          {token ? (
+            <Link to="/claim" className="hud-btn">
+              Rewards
+            </Link>
+          ) : null}
           {token && profile ? <NotificationBell /> : null}
           {myPage ? (
             <Link to={myPage} className="hud-btn hud-btn--primary">

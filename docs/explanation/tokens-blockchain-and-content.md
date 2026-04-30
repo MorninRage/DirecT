@@ -30,6 +30,8 @@ This section answers the most common confusion: **nobody “mines” the first D
 - **Mechanically**, those units are created by the **ERC-20 smart contract** ( **mint** at deploy ) and/or released over time by **authorized contracts** (emissions controller, vesting vaults). Exact bytecode is implementation-specific—see `contracts/` when wired for mainnet.
 - **Posting** affects **who gets a share of the weekly (or epoch) creator pool** R_e, where R_e is a **slice of the community-emissions budget**, not “coins appearing from thin air” because you uploaded a video.
 
+> **Testnet today:** A **Base Sepolia** deployment is **live** (treasury mint + rewards pool on `EmissionsController`). Exact addresses and hosting URLs are summarized in [`../deploy/current-environment.md`](../deploy/current-environment.md). Creator **claims** still require Merkle roots + UI or external tooling—see MVP **M3**.
+
 **Analogy — festival tickets:** The venue **prints a fixed number of tickets** before the show. Some go to **staff**, some to **sponsors**, some are held for **door prizes**, some for **fans** to buy. **Winning a guitar solo contest** does not print new cardboard; it decides who receives tickets **from the prize stash**.
 
 ### 2.2 Terms you need for “where coins come from”
@@ -338,5 +340,3 @@ Parameters—weights w_V, w_L, w_C, w_S, caps, epoch length, fee switches—are 
 | ---------- | ------------- | ------------------------------------------------------------------------------------- |
 | 2026-04-29 | Documentation | Added §2 genesis / initial supply, expanded glossary, renumbered sections.            |
 | 2026-04-29 | Documentation | Initial long-form explainer with analogies and toy examples aligned to repo v0 specs. |
-
-

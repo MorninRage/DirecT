@@ -1,17 +1,20 @@
 # Netlify: DirecT web (Vite SPA under apps/web)
-# GitHub: https://github.com/MorninRage/DirecT — link this repo in Netlify for CI (branch main).
+# GitHub: https://github.com/MorninRage/DirecT — connect repo in Netlify for CI/CD (branch main).
+# GitHub Actions: .github/workflows/ci.yml (relay + web + contracts on push/PR).
+# Further setup: docs/deploy/online.md and .github/README.md
 #
 # CLI-linked site (this folder): https://direct-social.netlify.app
 #   Dashboard: https://app.netlify.com/projects/direct-social
 #
 # Relay (Fly) for production API:
-#   https://morninrage-direct-relay.fly.dev
+#   https://morninrage-direct-relay.fly.dev  (see relay/fly.toml — set Fly secrets, do not commit)
 #
-# After deploying contracts to Base Sepolia (`contracts/scripts/deploy.ts`), add in
-# Netlify → Site configuration → Environment variables → Build (overrides below if needed):
-#   VITE_TOKEN_ADDRESS=<DirecTToken 0x address>
-#   VITE_EMISSIONS_ADDRESS=<EmissionsController 0x address>
-# Then trigger a new deploy so Vite bakes them into the bundle.
+# Build env (mirrored below; override in Netlify UI for production secrets):
+#   VITE_RELAY_URL, VITE_CHAIN_ID, VITE_RPC_URL — required
+#   VITE_TOKEN_ADDRESS, VITE_EMISSIONS_ADDRESS — required for DIR balance + /claim (Merkle rewards UI)
+#
+# After deploying contracts to Base Sepolia (`contracts/scripts/deploy.ts`), ensure Netlify has token + emissions
+# addresses (or run contracts npm run netlify:sync-token / ship:online). Redeploy after env changes.
 
 [build]
   base = "apps/web"

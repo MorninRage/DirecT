@@ -7,13 +7,18 @@ import { verifySignature, computeEid } from "./crypto.js";
 import { isReactionKind, REACTION_KINDS, type ReactionKind } from "./reactionKinds.js";
 import {
   assertWalletLinkedToHandle,
+  followAccount,
   getPublicProfile,
   linkWalletForAccount,
   linkWalletMessage,
+  listFollowersOf,
+  listFollowingOf,
+  listIndexerAccountSlice,
   login,
   normalizeHandle,
   registerAccount,
   resolveSession,
+  unfollowAccount,
   updateProfile,
   type AccountProfile,
 } from "./accounts.js";
@@ -24,6 +29,8 @@ import {
   persistMediaBlob,
   schedulePersistEvents,
 } from "./persistEvents.js";
+import { addPublishedRewardEpoch, getLatestRewardEpoch, loadRewardEpochs, type PublishedRewardEpoch } from "./rewardsEpochs.js";
+import { listRecentFollowsForTarget } from "./followActivity.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? 84532);
@@ -74,6 +81,7 @@ const metrics = new Map<string, Metrics>();
 const mediaBlobs = new Map<string, { mime: string; data: Buffer }>();
 
 loadEventsFromDisk(events, metrics);
+loadRewardEpochs();
 
 process.on("SIGTERM", () => {
   persistEventsNow(events, metrics);
@@ -235,8 +243,44 @@ function originalFeedSnapshot(origEidRaw: string):
   };
 }
 
+function requireIndexer(req: express.Request, res: express.Response): boolean {
+  const auth = req.headers["x-indexer-secret"];
+  if (!INDEXER_SECRET) {
+    res.status(503).json({ error: "indexer_disabled" });
+    return false;
+  }
+  if (auth !== INDEXER_SECRET) {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+  return true;
+}
+
+app.get("/v1/indexer/snapshot", (req, res) => {
+  if (!requireIndexer(req, res)) return;
+  const payload = {
+    schema: "direct.indexer.snapshot.v1",
+    chainId: CHAIN_ID,
+    exportedAtMs: Date.now(),
+    events: [...events.entries()],
+    metrics: [...metrics.entries()],
+    accounts: listIndexerAccountSlice(),
+  };
+  res.json(payload);
+});
+
 app.get("/v1/feed", (req, res) => {
   const hraw = typeof req.query.handle === "string" ? req.query.handle.trim().toLowerCase() : null;
+  const scope = typeof req.query.scope === "string" ? req.query.scope : "";
+  let followingSet: Set<string> | null = null;
+  if (scope === "following") {
+    const token = bearer(req);
+    const fh = resolveSession(token);
+    if (!fh) {
+      return res.status(401).json({ error: "auth_required" });
+    }
+    followingSet = new Set(listFollowingOf(fh));
+  }
   const list = [...events.entries()]
     .filter(([, env]) => {
       const t = String((env.event.body as { type?: string }).type ?? "");
@@ -246,6 +290,12 @@ app.get("/v1/feed", (req, res) => {
       if (!hraw) return true;
       const b = env.event.body as { direct_handle?: string };
       return String(b.direct_handle ?? "").toLowerCase() === hraw;
+    })
+    .filter(([, env]) => {
+      if (!followingSet) return true;
+      const b = env.event.body as { direct_handle?: string };
+      const dh = String(b.direct_handle ?? "").toLowerCase();
+      return Boolean(dh) && followingSet.has(dh);
     })
     .map(([eid, env]) => {
       const body = env.event.body as {
@@ -410,6 +460,92 @@ app.get("/v1/link-wallet/challenge", (req, res) => {
   return res.json({ message: linkWalletMessage(handle, ts), timestamp: ts });
 });
 
+app.post("/v1/accounts/me/follow", (req, res) => {
+  const handle = requireAuth(req, res);
+  if (!handle) return;
+  try {
+    const target = String((req.body as { handle?: string }).handle ?? "");
+    const prof = followAccount(handle, target);
+    return res.json(prof);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "follow_failed";
+    const code =
+      msg === "not_found" ? 404 : msg === "cannot_follow_self" ? 400 : msg === "following_limit" ? 400 : 400;
+    return res.status(code).json({ error: msg });
+  }
+});
+
+app.delete("/v1/accounts/me/follow/:handle", (req, res) => {
+  const me = requireAuth(req, res);
+  if (!me) return;
+  try {
+    const prof = unfollowAccount(me, req.params.handle);
+    return res.json(prof);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unfollow_failed";
+    return res.status(400).json({ error: msg });
+  }
+});
+
+app.get("/v1/accounts/:handle/followers", (req, res) => {
+  const h = normalizeHandle(req.params.handle);
+  if (!h) return res.status(400).json({ error: "invalid_handle" });
+  return res.json({ handles: listFollowersOf(h) });
+});
+
+app.get("/v1/accounts/:handle/following", (req, res) => {
+  const h = normalizeHandle(req.params.handle);
+  if (!h) return res.status(400).json({ error: "invalid_handle" });
+  return res.json({ handles: listFollowingOf(h) });
+});
+
+app.get("/v1/rewards/epochs/latest", (_req, res) => {
+  const ep = getLatestRewardEpoch();
+  if (!ep) return res.json({ epoch: null });
+  return res.json({ epoch: ep });
+});
+
+app.get("/v1/rewards/me", (req, res) => {
+  const handle = requireAuth(req, res);
+  if (!handle) return;
+  const ep = getLatestRewardEpoch();
+  if (!ep || ep.chainId !== CHAIN_ID) {
+    return res.json({ eligible: false, epoch: null });
+  }
+  const prof = getPublicProfile(handle);
+  if (!prof) return res.status(404).json({ error: "not_found" });
+  const wallets = new Set(prof.linkedWallets.map((a) => a.toLowerCase()));
+  const payout = prof.payoutAddress?.toLowerCase();
+  if (payout) wallets.add(payout);
+  for (const row of ep.allocations) {
+    const b = row.beneficiary.toLowerCase();
+    if (wallets.has(b)) {
+      return res.json({
+        eligible: true,
+        epochId: ep.id,
+        root: ep.root,
+        beneficiary: row.beneficiary,
+        amountWei: row.amountWei,
+        chainId: ep.chainId,
+        allocations: ep.allocations,
+      });
+    }
+  }
+  return res.json({ eligible: false, epoch: { id: ep.id, root: ep.root, chainId: ep.chainId } });
+});
+
+app.post("/v1/admin/rewards-epochs", (req, res) => {
+  if (!requireIndexer(req, res)) return;
+  try {
+    const body = req.body as PublishedRewardEpoch;
+    addPublishedRewardEpoch(body);
+    return res.status(201).json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "invalid_body";
+    return res.status(400).json({ error: msg });
+  }
+});
+
 app.get("/v1/posts/:eid/comments", (req, res) => {
   const pid = req.params.eid.toLowerCase();
   if (!events.has(pid)) return res.status(404).json({ error: "unknown_post" });
@@ -509,6 +645,55 @@ app.get("/v1/accounts/me/notifications", (req, res) => {
       at: env.event.header.timestamp,
       directHandle,
     });
+  }
+
+  for (const row of listRecentFollowsForTarget(prof.handle, 40)) {
+    items.push({
+      id: `follow-${row.follower}-${row.atMs}`,
+      kind: "follow",
+      postEid: "-",
+      actor: row.follower,
+      summary: `@${row.follower} followed you`,
+      at: Math.floor(row.atMs / 1000),
+      directHandle: row.follower,
+    });
+  }
+
+  const latest = getLatestRewardEpoch();
+  if (latest && latest.chainId === CHAIN_ID) {
+    for (const w of prof.linkedWallets) {
+      const low = w.toLowerCase();
+      const row = latest.allocations.find((a) => a.beneficiary.toLowerCase() === low);
+      if (row && BigInt(row.amountWei) > 0n) {
+        items.push({
+          id: `rewards-${latest.id}-${low}`,
+          kind: "rewards_claimable",
+          postEid: latest.id,
+          actor: "",
+          summary: `Rewards epoch ${latest.id}: you can claim ${row.amountWei} wei DIR — open Rewards`,
+          at: Math.floor(latest.publishedAtMs / 1000),
+          directHandle: null,
+        });
+      }
+    }
+    const pay = prof.payoutAddress?.toLowerCase();
+    if (pay) {
+      const row = latest.allocations.find((a) => a.beneficiary.toLowerCase() === pay);
+      if (row && BigInt(row.amountWei) > 0n) {
+        const id = `rewards-${latest.id}-${pay}`;
+        if (!items.some((i) => i.id === id)) {
+          items.push({
+            id,
+            kind: "rewards_claimable",
+            postEid: latest.id,
+            actor: "",
+            summary: `Rewards epoch ${latest.id}: payout address can claim ${row.amountWei} wei DIR`,
+            at: Math.floor(latest.publishedAtMs / 1000),
+            directHandle: null,
+          });
+        }
+      }
+    }
   }
 
   items.sort((a, b) => b.at - a.at);

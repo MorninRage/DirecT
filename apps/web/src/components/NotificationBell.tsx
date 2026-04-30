@@ -97,13 +97,17 @@ export function NotificationBell() {
           }}
         >
           <div className="hud-label" style={{ marginBottom: 8 }}>
-            Activity on your posts
+            Activity
           </div>
           {items.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--hud-dim)" }}>No comments, reactions, or reshares yet.</div>
+            <div style={{ fontSize: 13, color: "var(--hud-dim)" }}>No alerts yet — social activity and claimable rewards appear here.</div>
           ) : (
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
-              {items.map((n) => (
+              {items.map((n) => {
+                let primaryLink: { to: string; label: string } | null = { to: "/", label: "Open feed" };
+                if (n.kind === "rewards_claimable") primaryLink = { to: "/claim", label: "Open Rewards" };
+                else if (n.kind === "follow" && n.directHandle) primaryLink = { to: `/u/${n.directHandle}`, label: `@${n.directHandle}` };
+                return (
                 <li
                   key={n.id}
                   style={{
@@ -116,14 +120,16 @@ export function NotificationBell() {
                     {n.kind} · {new Date(n.at * 1000).toLocaleString()}
                   </div>
                   <div className="hud-mono" style={{ fontSize: 11, marginTop: 2 }}>
-                    {n.actor.slice(0, 8)}…
+                    {n.actor ? `${n.actor.slice(0, 8)}…` : "—"}
                   </div>
                   <div style={{ marginTop: 4 }}>{n.summary}</div>
                   <div style={{ marginTop: 6 }}>
-                    <Link className="hud-link" to="/">
-                      Open feed
-                    </Link>
-                    {n.directHandle ? (
+                    {primaryLink ? (
+                      <Link className="hud-link" to={primaryLink.to}>
+                        {primaryLink.label}
+                      </Link>
+                    ) : null}
+                    {n.kind !== "follow" && n.kind !== "rewards_claimable" && n.directHandle ? (
                       <>
                         {" · "}
                         <Link className="hud-link" to={`/u/${n.directHandle}`}>
@@ -133,7 +139,8 @@ export function NotificationBell() {
                     ) : null}
                   </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </div>

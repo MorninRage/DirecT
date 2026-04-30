@@ -23,6 +23,18 @@ npx hardhat test
 
 ## Deploy (example)
 
+### Agent / CI (no browser faucet)
+
+Coinbase **Developer Platform** can fund Base Sepolia ETH **via API** so scripts and agents do not use browser faucets.
+
+1. One-time: create **API Key ID**, **API Key Secret**, and **Wallet Secret** at [CDP API keys](https://portal.cdp.coinbase.com/access/api) (free tier).
+2. Add to `contracts/.env`: `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`, `CDP_WALLET_SECRET` (see `.env.example`).
+3. From `contracts/`: `npm run ship:online` — this runs CDP faucet (if keys present), deploy, Netlify env sync, and production deploy.
+
+Or fund only: `npm run fund:cdp`, then deploy as below.
+
+### Manual / default
+
 ```bash
 cd contracts
 npm install
@@ -44,6 +56,11 @@ npm run netlify:sync-token --prefix contracts
 # Local / CI simulation (no chain)
 npm run deploy:local   # hardhat in-memory; writes deployments/hardhat.json
 ```
+
+## Deployment record (where addresses live)
+
+- **`deployments/baseSepolia.json`** — written by `deploy:base`; **gitignored**; source of truth on your machine after deploy.
+- **[`docs/deploy/current-environment.md`](../docs/deploy/current-environment.md)** — doc snapshot of URLs + contract table (update when you redeploy).
 
 ## Merkle claims
 

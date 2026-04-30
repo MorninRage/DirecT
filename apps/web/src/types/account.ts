@@ -33,4 +33,8 @@ export type AccountProfile = {
   };
   layout: { cols: number; rowHeight: number; items: LayoutItem[] };
   linkedWallets: string[];
+  /** Optional preferred wallet for Merkle reward claims */
+  payoutAddress?: string | null;
+  /** Lowercase handles this profile follows */
+  following?: string[];
 };

@@ -1,7 +1,8 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { verifyMessage, type Address, type Hex } from "viem";
+import { type Address, type Hex, isAddress, verifyMessage } from "viem";
+import { recordFollow } from "./followActivity.js";
 
 /** Persisted under DATA_DIR (Fly volume: /data; local: relay/data). */
 const dataDir = process.env.DATA_DIR ?? join(process.cwd(), "data");
@@ -32,7 +33,12 @@ function loadAccountsState(): void {
     sessions.clear();
     const now = Date.now();
     for (const [k, v] of raw.accounts ?? []) {
-      if (k && v?.handle && v.passwordSalt && v.passwordHash && v.profile) accounts.set(k, v);
+      if (k && v?.handle && v.passwordSalt && v.passwordHash && v.profile) {
+        const p = v.profile as AccountProfile;
+        if (!Array.isArray(p.following)) p.following = [];
+        if (p.payoutAddress === undefined) p.payoutAddress = null;
+        accounts.set(k, v);
+      }
     }
     for (const [k, v] of raw.sessions ?? []) {
       if (k && v?.handle && v.exp > now) sessions.set(k, v);
@@ -67,6 +73,10 @@ export type AccountProfile = {
   /** Full-page background behind the draggable homepage grid. */
   pageBackgroundCid?: string | null;
   socialLinks: Record<string, string>;
+  /** Optional payout wallet for Merkle rewards (must be valid 0x address). */
+  payoutAddress?: string | null;
+  /** Lowercased handles this account follows (asymmetric follow). */
+  following: string[];
   settings: {
     compactFeed: boolean;
     showMetricsInline: boolean;
@@ -139,6 +149,8 @@ export function defaultProfile(handle: string, displayName?: string): AccountPro
     headerCid: null,
     pageBackgroundCid: null,
     socialLinks: {},
+    payoutAddress: null,
+    following: [],
     settings: defaultAccountSettings(),
     layout: {
       cols: 12,
@@ -205,6 +217,8 @@ export function getPublicProfile(handle: string): AccountProfile | null {
   }
   if (p.pageBackgroundCid === undefined) p.pageBackgroundCid = null;
   delete (p as { coverCid?: unknown }).coverCid;
+  if (!Array.isArray(p.following)) p.following = [];
+  if (p.payoutAddress === undefined) p.payoutAddress = null;
   return p;
 }
 
@@ -216,6 +230,13 @@ export function updateProfile(handle: string, patch: Partial<AccountProfile>): A
     rawPatch.headerCid = rawPatch.coverCid;
   }
   delete rawPatch.coverCid;
+  if (rawPatch.payoutAddress != null && rawPatch.payoutAddress !== "") {
+    const a = String(rawPatch.payoutAddress).trim();
+    if (!isAddress(a)) throw new Error("invalid_payout_address");
+    rawPatch.payoutAddress = a.toLowerCase();
+  } else if (rawPatch.payoutAddress === "") {
+    rawPatch.payoutAddress = null;
+  }
   const patch2 = rawPatch as Partial<AccountProfile>;
   const prev = acc.profile as AccountProfile & { coverCid?: string | null };
   const headerFallback = prev.headerCid ?? prev.coverCid ?? null;
@@ -237,6 +258,8 @@ export function updateProfile(handle: string, patch: Partial<AccountProfile>): A
         }
       : acc.profile.layout,
     linkedWallets: patch2.linkedWallets ?? acc.profile.linkedWallets,
+    payoutAddress: patch2.payoutAddress !== undefined ? patch2.payoutAddress : acc.profile.payoutAddress ?? null,
+    following: patch2.following !== undefined ? [...patch2.following] : [...(acc.profile.following ?? [])],
   };
   delete (next as { coverCid?: unknown }).coverCid;
   acc.profile = next;
@@ -271,4 +294,65 @@ export function assertWalletLinkedToHandle(handle: string | undefined, signer: s
   if (!acc.profile.linkedWallets.includes(signer.toLowerCase())) {
     throw new Error("wallet_not_linked");
   }
+}
+
+/** Indexer / epoch builder: public payout-relevant fields only. */
+export function listIndexerAccountSlice(): Array<{
+  handle: string;
+  linkedWallets: string[];
+  following: string[];
+  payoutAddress: string | null;
+}> {
+  return [...accounts.values()].map((a) => ({
+    handle: a.profile.handle,
+    linkedWallets: [...a.profile.linkedWallets],
+    following: [...(a.profile.following ?? [])],
+    payoutAddress: a.profile.payoutAddress ?? null,
+  }));
+}
+
+export function followAccount(meRaw: string, targetRaw: string): AccountProfile {
+  const me = normalizeHandle(meRaw);
+  const target = normalizeHandle(targetRaw);
+  if (!me || !target) throw new Error("invalid_handle");
+  if (me === target) throw new Error("cannot_follow_self");
+  if (!accounts.has(target)) throw new Error("not_found");
+  const acc = accounts.get(me);
+  if (!acc) throw new Error("not_found");
+  const set = new Set(acc.profile.following ?? []);
+  if (set.size >= 5000 && !set.has(target)) throw new Error("following_limit");
+  set.add(target);
+  acc.profile.following = [...set];
+  persistAccountsState();
+  recordFollow(me, target);
+  return getPublicProfile(me)!;
+}
+
+export function unfollowAccount(meRaw: string, targetRaw: string): AccountProfile {
+  const me = normalizeHandle(meRaw);
+  const target = normalizeHandle(targetRaw);
+  if (!me || !target) throw new Error("invalid_handle");
+  const acc = accounts.get(me);
+  if (!acc) throw new Error("not_found");
+  acc.profile.following = (acc.profile.following ?? []).filter((h) => h !== target);
+  persistAccountsState();
+  return getPublicProfile(me)!;
+}
+
+export function listFollowersOf(handleRaw: string): string[] {
+  const h = normalizeHandle(handleRaw);
+  if (!h) return [];
+  const out: string[] = [];
+  for (const acc of accounts.values()) {
+    if ((acc.profile.following ?? []).includes(h)) out.push(acc.profile.handle);
+  }
+  return out.sort();
+}
+
+export function listFollowingOf(handleRaw: string): string[] {
+  const h = normalizeHandle(handleRaw);
+  if (!h) return [];
+  const acc = accounts.get(h);
+  if (!acc) return [];
+  return [...(acc.profile.following ?? [])];
 }

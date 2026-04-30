@@ -5,9 +5,15 @@ cache_hardhat/
 cache/
 out/
 .env
+.env.*
+!.env.example
+!**/.env.example
 *.log
 .DS_Store
 relay/data/
+
+# Deployer-written addresses after `deploy:base` (keep local; docs hold a public copy for testnet)
+contracts/deployments/
 
 # Local Netlify folder
 .netlify

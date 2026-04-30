@@ -4,7 +4,7 @@ import GridLayout, { type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { useAccountProfile } from "../auth/AccountProvider";
-import { apiPatchProfile, apiPublicProfile } from "../api/relayAccounts";
+import { apiPatchProfile, apiPublicProfile, apiFollow, apiUnfollow, apiFollowers, apiFollowingHandles } from "../api/relayAccounts";
 import type { AccountProfile } from "../types/account";
 import { PostComposer } from "../components/PostComposer";
 import { PostCard, type FeedPost, type PostMetrics } from "../components/PostCard";
@@ -39,11 +39,12 @@ function profileToGridLayout(pub: AccountProfile): Layout[] {
 export function UserHomePage() {
   const { handle } = useParams<{ handle: string }>();
   const h = (handle ?? "").toLowerCase();
-  const { profile: me, token } = useAccountProfile();
+  const { profile: me, token, refresh } = useAccountProfile();
   const [pub, setPub] = useState<AccountProfile | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
   const [feed, setFeed] = useState<FeedPost[]>([]);
   const [metrics, setMetrics] = useState<Record<string, PostMetrics | undefined>>({});
+  const [socialCounts, setSocialCounts] = useState({ followers: 0, following: 0 });
   const [width, setWidth] = useState(() =>
     typeof window !== "undefined" ? Math.max(320, window.innerWidth - 32) : 1200,
   );
@@ -53,6 +54,34 @@ export function UserHomePage() {
   const lastSyncedHandle = useRef<string | null>(null);
 
   const isOwner = me?.handle === h;
+
+  const isFollowing =
+    Boolean(me && pub && !isOwner && (me.following ?? []).some((x) => x.toLowerCase() === pub.handle.toLowerCase()));
+
+  useEffect(() => {
+    if (!h) return;
+    void (async () => {
+      try {
+        const [fr, fg] = await Promise.all([apiFollowers(h), apiFollowingHandles(h)]);
+        setSocialCounts({ followers: fr.handles.length, following: fg.handles.length });
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [h]);
+
+  const toggleFollow = async () => {
+    if (!token || !pub || !me || isOwner) return;
+    try {
+      if (isFollowing) await apiUnfollow(token, pub.handle);
+      else await apiFollow(token, pub.handle);
+      await refresh();
+      const [fr, fg] = await Promise.all([apiFollowers(h), apiFollowingHandles(h)]);
+      setSocialCounts({ followers: fr.handles.length, following: fg.handles.length });
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     if (!pub || !isOwner) return;
@@ -224,7 +253,18 @@ export function UserHomePage() {
               @{pub.handle}
               {pub.profession ? ` · ${pub.profession}` : null}
               {pub.location ? ` · ${pub.location}` : null}
+              <span style={{ color: "var(--hud-dim)" }}>
+                {" "}
+                · {socialCounts.followers} followers · {socialCounts.following} following
+              </span>
             </p>
+            {!isOwner && token && me ? (
+              <div style={{ marginTop: 10 }}>
+                <button type="button" className="hud-btn hud-btn--primary" onClick={() => void toggleFollow()}>
+                  {isFollowing ? "Unfollow" : "Follow"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
         <p className="hud-home-bio" style={{ marginTop: 12 }}>

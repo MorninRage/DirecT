@@ -1,9 +1,14 @@
 # DirecT relay API — https://fly.io/docs
-# GitHub: MorninRage/DirecT — deploy from relay/:  fly launch (first time)  then  fly deploy
+# GitHub: https://github.com/MorninRage/DirecT — deploy from relay/:  fly deploy
 #
-# Persisted on volume (/data): relay-state.json (accounts), events-state.json (posts/events), media/ (uploads).
-# If this app name is taken globally, pick another and update netlify.toml VITE_RELAY_URL to match.
-# After first deploy:  fly secrets set CHAIN_ID=84532 INDEXER_SECRET=your-long-random-secret
+# Persisted on volume (/data): relay-state.json, events-state.json, rewards-epochs.json, media/
+# If this app name is taken globally, pick another and update netlify.toml VITE_RELAY_URL.
+#
+# Secrets (set via fly secrets set — never commit):
+#   CHAIN_ID=84532
+#   INDEXER_SECRET=<random>  — gates GET /v1/indexer/snapshot, POST /v1/admin/rewards-epochs, etc.
+#
+# Docs: docs/deploy/online.md, docs/deploy/current-environment.md
 
 app = "morninrage-direct-relay"
 primary_region = "iad"
@@ -30,7 +35,7 @@ primary_region = "iad"
 [[http_service.checks]]
   interval = "30s"
   timeout = "5s"
-  grace_period = "10s"
+  grace_period = "45s"
   method = "GET"
   path = "/health"
 

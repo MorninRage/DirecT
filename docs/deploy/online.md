@@ -4,20 +4,23 @@ This guide wires the **relay API** (Node/Express on [Fly.io](https://fly.io/docs
 
 > **Persistence:** The Fly relay stores **accounts**, **sessions**, **events/posts**, **metrics**, and **media** under **`DATA_DIR`** (Fly: **`/data`** volume). Redeploys keep data on the volume.
 
+**Live snapshot (URLs, contract addresses, scripts):** [`current-environment.md`](current-environment.md)
+
 ---
 
 ## What is already implemented vs not
 
 | Area | Status |
 |------|--------|
-| Web: auth, profiles, feed, My page, settings, notifications, **wallet dashboard (ETH + DIR balance)** | **Working** when `VITE_TOKEN_ADDRESS` is set at build time |
-| Relay: signed events, feed, metrics, media, accounts API | **Persists** on Fly volume (`relay-state.json`, `events-state.json`, `media/`) |
-| Chain verification `CHAIN_ID` on relay | Configurable via env (`84532` Base Sepolia default) |
-| Contracts: **1B cap DIR** + **transfer-based EmissionsController** | **In repo**; deploy to testnet and set Netlify env vars |
-| Merkle claim UI in web | **Not** built; claims are on-chain via wallet tooling |
-| Full emissions oracle / indexer → Merkle automation | **Not** in repo |
+| Web: auth, profiles, feed (All / Following), My page, settings, **Rewards (`/claim`)**, **wallet hub** (scrollable modal, ETH + DIR), notification bell (social + claimable rewards) | **Live** on Netlify when build env includes `VITE_TOKEN_ADDRESS` + `VITE_EMISSIONS_ADDRESS` for claims (see [`current-environment.md`](current-environment.md)) |
+| Relay: signed events, feed, metrics, media, accounts, **indexer snapshot**, **rewards epoch registry**, **follow** graph, extended notifications | **Deployed** on Fly; persists on volume (`relay-state.json`, `events-state.json`, `rewards-epochs.json`, `media/`) |
+| Chain verification `CHAIN_ID` on relay | Configurable via env (`84532` Base Sepolia default; align with `VITE_CHAIN_ID`) |
+| Contracts: **DIR** + **EmissionsController** on Base Sepolia | **Deployed**; genesis + 10M DIR seed in controller; addresses in local `deployments/baseSepolia.json` + doc snapshot |
+| Epoch tooling: **`build-epoch.cjs`**, **`epoch:register`**, operator runbook | **In repo** ([`current-environment.md` § M3](current-environment.md#m3-epoch--claim-runbook)) |
+| **One-command ship** (`npm run ship:online` in `contracts/`) | **CDP** optional faucet → gas check → deploy → Netlify env sync → production build ([`contracts/README.md`](../../contracts/README.md)) |
+| Full emissions oracle automation (unattended epochs) | **Not** in repo — operators run export → build → register → `POST /v1/admin/rewards-epochs` |
 
-**“Fully works online”** means: Netlify SPA, Fly relay, matching `VITE_CHAIN_ID` / relay `CHAIN_ID`, and (for DIR balances) **`VITE_TOKEN_ADDRESS`** from your deployment.
+**“Fully works online”** today means: Netlify SPA, Fly relay, matching `VITE_CHAIN_ID` / relay `CHAIN_ID`, token **and** emissions addresses in the Netlify build, and (for epochs) `INDEXER_SECRET` on the relay for snapshot + admin ingest.
 
 ---
 
@@ -97,7 +100,7 @@ You should see JSON with `"ok": true`.
 | `PORT` | **8080** in production (`relay/fly.toml` `[env]`). Fly’s proxy targets `internal_port`; without `PORT`, the server defaulted to **8787** and health checks failed. Local dev: **8787** via `.env`. |
 | `DATA_DIR` | **`/data`** in the container (Fly volume). Local dev: `relay/data/` via default. |
 | `CHAIN_ID` | EIP-712 verification chain id (default **84532** Base Sepolia). |
-| `INDEXER_SECRET` | If set, protects indexer-style `POST /v1/events/:eid/view` per relay code. |
+| `INDEXER_SECRET` | If set, required on **`x-indexer-secret`** for indexer snapshot (`GET /v1/indexer/snapshot`), admin epoch ingest (`POST /v1/admin/rewards-epochs`), and related routes. Rotate if leaked. |
 
 ### Costs / sleep
 
@@ -131,9 +134,11 @@ In **Site configuration → Environment variables → Builds**, add:
 | `VITE_CHAIN_ID` | `84532` |
 | `VITE_RPC_URL` | `https://sepolia.base.org` (or Alchemy/Infura URL) |
 | `VITE_TOKEN_ADDRESS` | DirecTToken `0x…` after deploy (enables **DIR** balance in Wallet UI) |
-| `VITE_EMISSIONS_ADDRESS` | EmissionsController `0x…` after deploy (for future claim flows / docs) |
+| `VITE_EMISSIONS_ADDRESS` | EmissionsController `0x…` — required for **Rewards /claim** in the web app. |
 
-**Local flow (recommended):** keep the deployer **private key** only in `contracts/.env` (never committed). From `contracts/`: `npm run gen:deployer` → fund the printed address → `npm run deploy:base` → from repo root `npm run netlify:sync-token --prefix contracts`. See [`contracts/README.md`](../../contracts/README.md).
+**Automated flow (recommended for agents / CI):** add Coinbase **CDP** keys to `contracts/.env` and run **`npm run ship:online`** from `contracts/` — funds testnet gas (no browser), deploys, syncs Netlify token env vars, and runs a production Netlify build. See [`contracts/README.md`](../../contracts/README.md).
+
+**Manual flow:** `npm run gen:deployer` → fund deployer on Base Sepolia → `npm run deploy:base` → from repo root `npm run netlify:sync-token --prefix contracts` → trigger a Netlify production deploy.
 
 Redeploy after changing env vars (Vite bakes them in at build time).
 
@@ -159,7 +164,7 @@ The relay uses `cors()` wide open — acceptable for early demos. Before mainnet
 
 1. `fly deploy` → `curl https://<relay>.fly.dev/health` OK.  
 2. Netlify build green with `VITE_RELAY_URL` = that relay URL.  
-3. Open Netlify URL → sign up → Wallet → link → post on My page.  
+3. Open Netlify URL → sign up → **Wallet** (modal scrolls; **Close** / **×** / backdrop / Esc) → link address in Settings → post on My page → optional **Rewards** if an epoch is published.  
 4. Optional: second browser / incognito → confirm public `/u/:handle` loads.  
 
 ---
@@ -178,6 +183,7 @@ The relay uses `cors()` wide open — acceptable for early demos. Before mainnet
 
 ## Related docs
 
+- [`current-environment.md`](current-environment.md) — **URLs, contract addresses, script inventory** (update on redeploy).  
 - [`mvp-scope.md`](../mvp-scope.md) — what “done” means for the product loop.  
 - [`protocol/README.md`](../protocol/README.md) — API paths the relay exposes.  
 - Fly: [Deploy an app](https://fly.io/docs/getting-started/launch-remix/) pattern matches Docker deploy.  

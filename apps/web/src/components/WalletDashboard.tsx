@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { usePublicClient } from "wagmi";
 import { formatEther, formatUnits, type Address } from "viem";
 import { appChain } from "../chains";
-import { TOKEN_ADDRESS } from "../config";
+import { TOKEN_ADDRESS, EMISSIONS_ADDRESS } from "../config";
 import { direcTokenPublicAbi } from "../abi/direcToken";
 
 type Props = { address: Address };
@@ -99,7 +100,16 @@ export function WalletDashboard({ address }: Props) {
         Your DirecT wallet (signing address)
       </div>
       <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--hud-dim)", lineHeight: 1.5 }}>
-        This address signs your posts and will receive <strong>DIR</strong> from on-chain payouts when your deployment wires the token contract. Save a backup if you use an embedded session key.
+        This address signs your posts and receives <strong>DIR</strong> from on-chain Merkle claims when you are in a published epoch.
+        {EMISSIONS_ADDRESS ? (
+          <>
+            {" "}
+            <Link className="hud-link" to="/claim">
+              Open Rewards to claim
+            </Link>
+            .
+          </>
+        ) : null}
       </p>
       <div className="hud-mono" style={{ fontSize: 12, wordBreak: "break-all", marginBottom: 8 }}>
         {address}

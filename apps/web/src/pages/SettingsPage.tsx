@@ -29,6 +29,8 @@ export function SettingsPage() {
       communityFeedUnlocked: false,
     };
     d.settings = { ...defaults, ...d.settings };
+    if (!Array.isArray(d.following)) d.following = [];
+    if (d.payoutAddress === undefined) d.payoutAddress = null;
     if (d.headerCid === undefined && d.coverCid != null) {
       d.headerCid = d.coverCid;
     }
@@ -59,6 +61,7 @@ export function SettingsPage() {
         profession: draft.profession,
         location: draft.location,
         socialLinks: draft.socialLinks,
+        payoutAddress: draft.payoutAddress?.trim() ? draft.payoutAddress.trim() : null,
         settings: draft.settings,
       });
       setDraft(next);
@@ -231,6 +234,17 @@ export function SettingsPage() {
               />
             ))}
           </div>
+
+          <label className="hud-label">Payout address (optional)</label>
+          <input
+            className="hud-input hud-mono"
+            placeholder="0x… — overrides first linked wallet for Merkle claims"
+            value={draft.payoutAddress ?? ""}
+            onChange={(e) => setDraft({ ...draft, payoutAddress: e.target.value })}
+          />
+          <p style={{ margin: 0, fontSize: 12, color: "var(--hud-dim)", lineHeight: 1.5 }}>
+            If set, epoch builders and the relay use this 0x address as your beneficiary. Leave blank to use your first linked wallet.
+          </p>
 
           <div className="hud-label">Interface</div>
           <label style={{ display: "flex", gap: 8, alignItems: "center" }}>

@@ -1,5 +1,7 @@
 # DirecT protocol specification (v0)
 
+**Broader product status (non-normative):** [status-and-roadmap.md](../STATUS-AND-ROADMAP.md)
+
 Decentralized **data plane** (relays, optional PDS) + **L2 settlement** (token, emissions, governance). This document defines wire formats and cryptography; economics and governance are in `docs/economics/` and `docs/governance/`. For intuition with analogies and worked examples, see `[explanation/tokens-blockchain-and-content.md](../explanation/tokens-blockchain-and-content.md)`.
 
 ## 1. Identifiers and hashing
@@ -88,7 +90,23 @@ Base path: `/v1`.
 | `GET`  | `/v1/metrics/:eid`            | Engagement counters for a post `eid`.                               |
 | `POST` | `/v1/media`                   | `multipart/form-data` field `file` — returns `{ cid, mime, size }`. |
 | `GET`  | `/v1/media/:cid`              | Stream uploaded bytes (relay-local MVP).                            |
+| `GET`  | `/v1/indexer/snapshot`        | **Indexer only:** header `x-indexer-secret` = `INDEXER_SECRET`. JSON: `events`, `metrics`, public account slice (`handle`, `linkedWallets`, `payoutAddress`, `following`). No password material. |
+| `GET`  | `/v1/feed?scope=following`   | Optional `scope=following` with **Bearer** session: posts whose `direct_handle` is in the viewer’s following set. |
+| `GET`  | `/v1/rewards/epochs/latest`    | Latest **published** Merkle epoch metadata + `allocations[]` (for claim UI). |
+| `GET`  | `/v1/rewards/me`               | **Session:** whether the caller’s linked wallets / `payoutAddress` match an allocation in the latest epoch. |
+| `POST` | `/v1/admin/rewards-epochs`    | **Indexer secret:** JSON body `PublishedRewardEpoch` (`id`, `root`, `chainId`, `publishedAtMs`, optional `registerTxHash` / `manifestUrl`, `allocations`). Persists for `/rewards/*` + notifications. |
+| `POST` | `/v1/accounts/me/follow`     | **Session:** JSON `{ "handle": "target" }` — asymmetric follow. |
+| `DELETE` | `/v1/accounts/me/follow/:handle` | **Session:** unfollow. |
+| `GET`  | `/v1/accounts/:handle/followers` | `{ "handles": string[] }`. |
+| `GET`  | `/v1/accounts/:handle/following` | `{ "handles": string[] }`. |
 
+
+### 4.1 Indexer snapshot & epoch ingest
+
+1. **Export:** `curl -H "x-indexer-secret: $SECRET" "$RELAY/v1/indexer/snapshot"` → save as `snapshot.json`.
+2. **Build epoch (off-chain):** `contracts/scripts/build-epoch.cjs` + policy file → `epoch-<id>.json` (`root`, `allocations`, …). Uses OpenZeppelin `StandardMerkleTree` (`address`, `uint256`) matching `EmissionsController.claim` leaf hashing.
+3. **Register root:** deployer calls `registerRoot` on `EmissionsController` (e.g. `npm run epoch:register -- ../epochs/epoch-m3.json` from `contracts/` with `DEPLOYER_PRIVATE_KEY` and `deployments/baseSepolia.json`).
+4. **Publish to relay:** `POST /v1/admin/rewards-epochs` with the same `id`, `root`, `chainId`, `publishedAtMs`, `allocations`, and optional `registerTxHash`. **Users must trust** this payload matches the on-chain root (see deploy docs for manifest / URL conventions).
 
 ### Reactions & reshares
 
@@ -109,8 +127,10 @@ PDS is **optional in MVP**; default path is client → relay.
 
 ## 6. Interop with settlement layer
 
-- **Rewards:** Indexers compute finalized aggregates → Merkle roots → L2 `Emissions` contract (see contracts README).
+- **Rewards:** Indexers compute finalized aggregates → Merkle roots → L2 `EmissionsController` (see [`contracts/README.md`](../../contracts/README.md)).
 - **Governance:** Same `author` addresses may hold DIR and vote (see governance doc).
+
+**Live testnet:** Base Sepolia deployment snapshot (token + emissions addresses) is documented in [`../deploy/current-environment.md`](../deploy/current-environment.md).
 
 ## 7. Versioning
 

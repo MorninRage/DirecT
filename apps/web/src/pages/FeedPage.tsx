@@ -5,7 +5,7 @@ import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { useAccountProfile } from "../auth/AccountProvider";
 import { apiPatchProfile } from "../api/relayAccounts";
 import { RELAY } from "../config";
-import { feedUrl } from "../api/feed";
+import { feedUrl, fetchFeed } from "../api/feed";
 
 export function FeedPage() {
   const { address, ready } = useDirectAuth();
@@ -13,6 +13,7 @@ export function FeedPage() {
   const [feed, setFeed] = useState<FeedPost[]>([]);
   const [metrics, setMetrics] = useState<Record<string, PostMetrics | undefined>>({});
   const [unlockBusy, setUnlockBusy] = useState(false);
+  const [feedScope, setFeedScope] = useState<"all" | "following">("all");
 
   const feedUnlocked = profile?.settings.communityFeedUnlocked === true;
   const linked =
@@ -23,9 +24,10 @@ export function FeedPage() {
 
   const refreshFeed = useCallback(async () => {
     if (!feedUnlocked) return;
-    const r = await fetch(feedUrl());
+    const r =
+      feedScope === "following" && token ? await fetchFeed({ token, scope: "following" }) : await fetch(feedUrl());
     if (r.ok) setFeed(await r.json());
-  }, [feedUnlocked]);
+  }, [feedUnlocked, feedScope, token]);
 
   useEffect(() => {
     void refreshFeed();
@@ -116,8 +118,28 @@ export function FeedPage() {
       {feedUnlocked ? (
         <section className="hud-panel">
           <div className="hud-label">Network feed</div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <strong>Latest posts</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <strong>{feedScope === "following" ? "Following" : "Everyone"}</strong>
+              <button
+                type="button"
+                className="hud-btn"
+                disabled={!token}
+                onClick={() => setFeedScope("all")}
+                style={feedScope === "all" ? { opacity: 1 } : { opacity: 0.65 }}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className="hud-btn"
+                disabled={!token}
+                onClick={() => setFeedScope("following")}
+                style={feedScope === "following" ? { opacity: 1 } : { opacity: 0.65 }}
+              >
+                Following
+              </button>
+            </div>
             <button type="button" className="hud-btn" onClick={() => void refreshFeed()}>
               Refresh
             </button>
