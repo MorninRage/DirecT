@@ -5,6 +5,8 @@ import { useAccountProfile } from "../auth/AccountProvider";
 import { apiLinkWallet, apiLinkWalletChallenge, apiPatchProfile } from "../api/relayAccounts";
 import type { AccountProfile } from "../types/account";
 import { useOpenWalletHub } from "../components/walletHubContext";
+import { uploadMedia } from "../lib/submitEvent";
+import { RELAY } from "../config";
 
 const LINK_KEYS = ["website", "twitter", "x", "instagram", "github", "youtube", "linkedin", "tiktok"] as const;
 
@@ -14,6 +16,7 @@ export function SettingsPage() {
   const openWalletHub = useOpenWalletHub();
   const [draft, setDraft] = useState<AccountProfile | null>(null);
   const [status, setStatus] = useState("");
+  const [imgBusy, setImgBusy] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -79,6 +82,23 @@ export function SettingsPage() {
     }
   };
 
+  const uploadCoverOrAvatar = async (file: File | undefined, field: "avatarCid" | "coverCid") => {
+    if (!file || !token || !draft) return;
+    setImgBusy(true);
+    setStatus("Uploading image…");
+    try {
+      const up = await uploadMedia(file);
+      const next = await apiPatchProfile(token, { [field]: up.cid });
+      setDraft(next);
+      await refresh();
+      setStatus(field === "avatarCid" ? "Profile photo saved." : "Page background saved.");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
   return (
     <div>
       <section className="hud-panel">
@@ -112,6 +132,55 @@ export function SettingsPage() {
 
           <label className="hud-label">Location</label>
           <input className="hud-input" value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} />
+
+          <div className="hud-label">Profile & page images</div>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--hud-dim)", lineHeight: 1.5 }}>
+            Shown on your public page. Anyone visiting <strong>/u/{profile.handle}</strong> sees your photo and background.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start", marginTop: 8 }}>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 6 }}>Profile photo</div>
+              {draft.avatarCid ? (
+                <img
+                  src={`${RELAY}/v1/media/${draft.avatarCid}`}
+                  alt=""
+                  style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", display: "block", marginBottom: 8 }}
+                />
+              ) : (
+                <div className="hud-mono" style={{ fontSize: 12, color: "var(--hud-dim)", marginBottom: 8 }}>
+                  None
+                </div>
+              )}
+              <input
+                className="hud-input"
+                type="file"
+                accept="image/*"
+                disabled={imgBusy}
+                onChange={(e) => void uploadCoverOrAvatar(e.target.files?.[0], "avatarCid")}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 6 }}>Page background</div>
+              {draft.coverCid ? (
+                <img
+                  src={`${RELAY}/v1/media/${draft.coverCid}`}
+                  alt=""
+                  style={{ width: 160, height: 72, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8 }}
+                />
+              ) : (
+                <div className="hud-mono" style={{ fontSize: 12, color: "var(--hud-dim)", marginBottom: 8 }}>
+                  None
+                </div>
+              )}
+              <input
+                className="hud-input"
+                type="file"
+                accept="image/*"
+                disabled={imgBusy}
+                onChange={(e) => void uploadCoverOrAvatar(e.target.files?.[0], "coverCid")}
+              />
+            </div>
+          </div>
 
           <div className="hud-label">Social links</div>
           <div style={{ display: "grid", gap: 8 }}>

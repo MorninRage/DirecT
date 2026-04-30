@@ -60,6 +60,10 @@ export type AccountProfile = {
   about: string;
   profession: string;
   location: string;
+  /** Keccak content id from POST /v1/media (profile photo). */
+  avatarCid?: string | null;
+  /** Keccak content id from POST /v1/media (page background). */
+  coverCid?: string | null;
   socialLinks: Record<string, string>;
   settings: {
     compactFeed: boolean;
@@ -129,6 +133,8 @@ export function defaultProfile(handle: string, displayName?: string): AccountPro
     about: "",
     profession: "",
     location: "",
+    avatarCid: null,
+    coverCid: null,
     socialLinks: {},
     settings: defaultAccountSettings(),
     layout: {
@@ -189,6 +195,8 @@ export function getPublicProfile(handle: string): AccountProfile | null {
   if (!acc) return null;
   const p = structuredClone(acc.profile);
   p.settings = { ...defaultAccountSettings(), ...p.settings };
+  if (p.avatarCid === undefined) p.avatarCid = null;
+  if (p.coverCid === undefined) p.coverCid = null;
   return p;
 }
 
@@ -199,6 +207,8 @@ export function updateProfile(handle: string, patch: Partial<AccountProfile>): A
     ...acc.profile,
     ...patch,
     handle: acc.profile.handle,
+    avatarCid: patch.avatarCid !== undefined ? patch.avatarCid : acc.profile.avatarCid ?? null,
+    coverCid: patch.coverCid !== undefined ? patch.coverCid : acc.profile.coverCid ?? null,
     settings: { ...defaultAccountSettings(), ...acc.profile.settings, ...patch.settings },
     socialLinks: { ...acc.profile.socialLinks, ...patch.socialLinks },
     layout: patch.layout

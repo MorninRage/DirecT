@@ -146,6 +146,12 @@ app.post("/v1/events", async (req, res) => {
     if (typeof parentRaw === "string" && parentRaw.startsWith("0x")) {
       applyEngagement(parentRaw, body);
     }
+    if (type === "repost") {
+      const ro = body.repost_of;
+      if (typeof ro === "string" && ro.startsWith("0x")) {
+        applyEngagement(ro, { type: "share" });
+      }
+    }
     return res.status(201).json({ eid: key, type });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "invalid_event";
@@ -172,10 +178,41 @@ app.get("/v1/authors/:address/events", (req, res) => {
   return res.json(list);
 });
 
+function originalFeedSnapshot(origEidRaw: string):
+  | {
+      eid: string;
+      preview?: string;
+      media: { cid?: string; mime?: string }[];
+      author: string;
+      direct_handle: string | null;
+    }
+  | null {
+  const origEid = origEidRaw.toLowerCase();
+  const env = events.get(origEid);
+  if (!env) return null;
+  const body = env.event.body as {
+    type?: string;
+    text?: string;
+    media?: { cid?: string; mime?: string }[];
+    direct_handle?: string;
+  };
+  const media = Array.isArray(body.media) ? body.media : [];
+  return {
+    eid: origEid,
+    preview: body.text?.slice(0, 280),
+    media,
+    author: env.event.header.author,
+    direct_handle: body.direct_handle ?? null,
+  };
+}
+
 app.get("/v1/feed", (req, res) => {
   const hraw = typeof req.query.handle === "string" ? req.query.handle.trim().toLowerCase() : null;
   const list = [...events.entries()]
-    .filter(([, env]) => String((env.event.body as { type?: string }).type ?? "") === "post")
+    .filter(([, env]) => {
+      const t = String((env.event.body as { type?: string }).type ?? "");
+      return t === "post" || t === "repost";
+    })
     .filter(([, env]) => {
       if (!hraw) return true;
       const b = env.event.body as { direct_handle?: string };
@@ -183,12 +220,14 @@ app.get("/v1/feed", (req, res) => {
     })
     .map(([eid, env]) => {
       const body = env.event.body as {
+        type?: string;
         text?: string;
+        repost_of?: string;
         media?: { cid?: string; mime?: string }[];
         direct_handle?: string;
       };
       const media = Array.isArray(body.media) ? body.media : [];
-      return {
+      const base = {
         eid,
         timestamp: env.event.header.timestamp,
         author: env.event.header.author,
@@ -196,7 +235,15 @@ app.get("/v1/feed", (req, res) => {
         preview: body.text?.slice(0, 280),
         media,
         direct_handle: body.direct_handle ?? null,
+        repost_of: null as string | null,
+        original: null as ReturnType<typeof originalFeedSnapshot>,
       };
+      if (body.type === "repost" && typeof body.repost_of === "string") {
+        const ro = body.repost_of.toLowerCase();
+        base.repost_of = ro;
+        base.original = originalFeedSnapshot(ro);
+      }
+      return base;
     })
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 100);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Address } from "viem";
 import { useDirectAuth } from "../auth/DirectAuthProvider";
+import { useAccountProfile } from "../auth/AccountProvider";
 import { RELAY } from "../config";
 import type { EventHeader } from "../eip712";
 import { submitEvent } from "../lib/submitEvent";
@@ -16,6 +17,14 @@ export type FeedPost = {
   preview?: string;
   media?: { cid?: string; mime?: string }[];
   direct_handle?: string | null;
+  repost_of?: string | null;
+  original?: {
+    eid: string;
+    preview?: string;
+    media?: { cid?: string; mime?: string }[];
+    author: string;
+    direct_handle: string | null;
+  } | null;
 };
 
 export type PostMetrics = {
@@ -26,6 +35,36 @@ export type PostMetrics = {
 };
 
 type CommentRow = { eid: string; author: string; timestamp: number; text: string };
+
+function profilePathFor(handle: string | null | undefined, author: string) {
+  return handle ? `/u/${handle}` : `/direct/${author}`;
+}
+
+function PostMedia({
+  media,
+}: {
+  media: { cid?: string; mime?: string }[] | undefined;
+}) {
+  const list = media ?? [];
+  const video = list.find((m) => m.mime?.startsWith("video/") && m.cid);
+  const images = list.filter((m) => m.mime?.startsWith("image/") && m.cid);
+  return (
+    <>
+      {images.map((m, i) => (
+        <img
+          key={`${m.cid}-${i}`}
+          className="hud-post-image"
+          src={`${RELAY}/v1/media/${m.cid}`}
+          alt=""
+          style={{ maxWidth: "100%", borderRadius: 8, marginTop: 8, display: "block" }}
+        />
+      ))}
+      {video?.cid ? (
+        <video className="hud-video" controls src={`${RELAY}/v1/media/${video.cid}`} style={{ marginTop: images.length ? 8 : 0 }} />
+      ) : null}
+    </>
+  );
+}
 
 export function PostCard({
   post,
@@ -39,11 +78,16 @@ export function PostCard({
   onFeedRefresh: () => void;
 }) {
   const { address, signEnvelope } = useDirectAuth();
+  const { profile } = useAccountProfile();
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
 
   const profilePath = post.direct_handle ? `/u/${post.direct_handle}` : `/direct/${post.author}`;
+  const reshareHandle =
+    profile && address && profile.linkedWallets.some((a) => a.toLowerCase() === address.toLowerCase())
+      ? profile.handle
+      : null;
 
   const loadComments = async () => {
     const r = await fetch(`${RELAY}/v1/posts/${post.eid}/comments`);
@@ -83,9 +127,32 @@ export function PostCard({
     }
   };
 
-  const onShare = async () => {
+  const onReshare = async () => {
+    if (!address) return;
+    if (!reshareHandle) {
+      alert("Link your signing wallet to your profile in Settings to reshare — your repost will appear on My page and in the network feed.");
+      return;
+    }
     try {
-      await sendChild("share", { note: "reshare" });
+      const body: Record<string, unknown> = {
+        type: "repost",
+        schema: "direct.repost.v1",
+        repost_of: post.repost_of && post.original ? post.repost_of : post.eid,
+        text: "",
+        media: [],
+        reply_to: null,
+        created_at: new Date().toISOString(),
+        direct_handle: reshareHandle,
+      };
+      const header: EventHeader = {
+        author: address as Address,
+        schema: "direct.repost.v1",
+        timestamp: Math.floor(Date.now() / 1000),
+        nonce: crypto.randomUUID(),
+        prev_eid: null,
+      };
+      const payload = await signEnvelope(header, body);
+      await submitEvent(payload);
       await onRefreshMetrics();
       await onFeedRefresh();
     } catch (e) {
@@ -114,13 +181,16 @@ export function PostCard({
     }
   };
 
-  const video = post.media?.find((m) => m.mime?.startsWith("video/") && m.cid);
   const summary = metrics
     ? Object.entries(metrics.reactions)
         .filter(([, n]) => n > 0)
         .map(([k, n]) => `${k}:${n}`)
         .join(" · ")
     : null;
+
+  const orig = post.original;
+  const isRepost = Boolean(post.repost_of && orig);
+  const hasMedia = Boolean(post.media?.some((m) => m.cid));
 
   return (
     <article className="hud-post">
@@ -130,10 +200,52 @@ export function PostCard({
         </Link>
         <span>{new Date(post.timestamp * 1000).toLocaleString()}</span>
       </div>
-      <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap" }}>{post.preview}</p>
-      {video?.cid ? (
-        <video className="hud-video" controls src={`${RELAY}/v1/media/${video.cid}`} />
-      ) : null}
+
+      {isRepost ? (
+        <>
+          {post.preview ? (
+            <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap" }}>{post.preview}</p>
+          ) : (
+            <p style={{ margin: "6px 0 0", color: "var(--hud-dim)", fontSize: 13 }}>Reshared</p>
+          )}
+          <div
+            style={{
+              marginTop: 10,
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid rgba(126,203,255,0.25)",
+              background: "rgba(0,0,0,0.2)",
+            }}
+          >
+            <div className="hud-label" style={{ marginBottom: 6 }}>
+              Original
+            </div>
+            {orig ? (
+              <>
+                <div className="hud-mono" style={{ fontSize: 12, marginBottom: 6 }}>
+                  <Link className="hud-link" to={profilePathFor(orig.direct_handle, orig.author)}>
+                    {orig.direct_handle ? `@${orig.direct_handle}` : `${orig.author.slice(0, 6)}…${orig.author.slice(-4)}`}
+                  </Link>
+                </div>
+                {orig.preview ? <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{orig.preview}</p> : null}
+                <PostMedia media={orig.media} />
+              </>
+            ) : (
+              <div style={{ color: "var(--hud-dim)" }}>Original post is not available on this relay.</div>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          {post.preview ? (
+            <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap" }}>{post.preview}</p>
+          ) : hasMedia ? null : (
+            <p style={{ margin: "6px 0 0", color: "var(--hud-dim)" }}>(no text)</p>
+          )}
+          <PostMedia media={post.media} />
+        </>
+      )}
+
       {metrics ? (
         <div className="hud-post-metrics hud-mono" style={{ marginTop: 10, fontSize: 11, color: "var(--hud-dim)" }}>
           views {metrics.views} · shares {metrics.shares} · comments {metrics.comments}
@@ -150,7 +262,7 @@ export function PostCard({
         <button type="button" className="hud-btn" disabled={!address} onClick={() => void onView()}>
           Register view
         </button>
-        <button type="button" className="hud-btn hud-btn--primary" disabled={!address} onClick={() => void onShare()}>
+        <button type="button" className="hud-btn hud-btn--primary" disabled={!address} onClick={() => void onReshare()}>
           Reshare
         </button>
         <button type="button" className="hud-btn" onClick={() => void onRefreshMetrics()}>

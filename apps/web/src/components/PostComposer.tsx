@@ -23,6 +23,7 @@ export function PostComposer({
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [video, setVideo] = useState<File | null>(null);
+  const [images, setImages] = useState<File[]>([]);
 
   const handleForPost =
     directHandle ??
@@ -30,21 +31,29 @@ export function PostComposer({
       ? profile.handle
       : undefined);
 
+  const hasMedia = Boolean(video) || images.length > 0;
+  const canPublish = Boolean(address && (text.trim() || hasMedia));
+
   const publish = async () => {
-    if (!address) return;
+    if (!address || !canPublish) return;
     setBusy(true);
     setStatus("");
     try {
       const media: { cid: string; mime: string; size: number }[] = [];
+      for (const file of images) {
+        setStatus("Uploading images…");
+        const up = await uploadMedia(file);
+        media.push({ cid: up.cid, mime: up.mime, size: file.size });
+      }
       if (video) {
-        setStatus("Uploading media…");
+        setStatus("Uploading video…");
         const up = await uploadMedia(video);
         media.push({ cid: up.cid, mime: up.mime, size: video.size });
       }
       const body: Record<string, unknown> = {
         type: "post",
         schema: "direct.post.v1",
-        text,
+        text: text.trim(),
         media,
         reply_to: null,
         created_at: new Date().toISOString(),
@@ -62,6 +71,7 @@ export function PostComposer({
       await submitEvent(payload);
       setText("");
       setVideo(null);
+      setImages([]);
       setStatus("Published.");
       onPosted();
     } catch (e) {
@@ -92,8 +102,23 @@ export function PostComposer({
         className="hud-textarea"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Write a post…"
+        placeholder="Write a post… (optional if you attach media)"
       />
+      <div style={{ marginTop: 10 }}>
+        <div className="hud-label">Photos</div>
+        <input
+          className="hud-input"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => setImages(e.target.files?.length ? Array.from(e.target.files) : [])}
+        />
+        {images.length ? (
+          <div className="hud-mono" style={{ marginTop: 6 }}>
+            {images.length} file{images.length === 1 ? "" : "s"} selected
+          </div>
+        ) : null}
+      </div>
       <div style={{ marginTop: 10 }}>
         <div className="hud-label">Video</div>
         <input
@@ -105,12 +130,7 @@ export function PostComposer({
         {video ? <div className="hud-mono" style={{ marginTop: 6 }}>{video.name}</div> : null}
       </div>
       <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <button
-          type="button"
-          className="hud-btn hud-btn--primary"
-          disabled={busy || !text.trim() || !address}
-          onClick={() => void publish()}
-        >
+        <button type="button" className="hud-btn hud-btn--primary" disabled={busy || !canPublish} onClick={() => void publish()}>
           Publish
         </button>
         {status ? <span className="hud-mono">{status}</span> : null}

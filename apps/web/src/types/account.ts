@@ -15,6 +15,10 @@ export type AccountProfile = {
   about: string;
   profession: string;
   location: string;
+  /** Profile photo from relay /v1/media/:cid */
+  avatarCid?: string | null;
+  /** Page background image from relay /v1/media/:cid */
+  coverCid?: string | null;
   socialLinks: Record<string, string>;
   settings: {
     compactFeed: boolean;

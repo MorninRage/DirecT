@@ -170,15 +170,50 @@ export function UserHomePage() {
           </p>
         </div>
       ) : null}
-      <section className="hud-panel hud-panel--hero">
+      <section
+        className="hud-panel hud-panel--hero"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          ...(pub.coverCid
+            ? {
+                backgroundImage: `linear-gradient(rgba(6,10,18,0.82), rgba(6,10,18,0.92)), url(${RELAY}/v1/media/${pub.coverCid})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : {}),
+        }}
+      >
         <div className="hud-label">Profile</div>
-        <h1 className="hud-home-title">{pub.displayName}</h1>
-        <p className="hud-home-meta">
-          @{pub.handle}
-          {pub.profession ? ` · ${pub.profession}` : null}
-          {pub.location ? ` · ${pub.location}` : null}
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          {pub.avatarCid ? (
+            <img
+              src={`${RELAY}/v1/media/${pub.avatarCid}`}
+              alt=""
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: "2px solid rgba(126,203,255,0.35)",
+                flexShrink: 0,
+              }}
+            />
+          ) : null}
+          <div>
+            <h1 className="hud-home-title" style={{ margin: "0 0 4px" }}>
+              {pub.displayName}
+            </h1>
+            <p className="hud-home-meta" style={{ margin: 0 }}>
+              @{pub.handle}
+              {pub.profession ? ` · ${pub.profession}` : null}
+              {pub.location ? ` · ${pub.location}` : null}
+            </p>
+          </div>
+        </div>
+        <p className="hud-home-bio" style={{ marginTop: 12 }}>
+          {pub.bio}
         </p>
-        <p className="hud-home-bio">{pub.bio}</p>
       </section>
 
       <GridLayout
@@ -197,7 +232,7 @@ export function UserHomePage() {
         isResizable={Boolean(isOwner)}
         resizeHandles={isOwner ? ["s", "w", "e", "n", "sw", "nw", "se", "ne"] : undefined}
         draggableHandle=".hud-grid-drag"
-        draggableCancel=".hud-composer-embed, textarea, input, button, select, .hud-link, a, video, [role='slider']"
+        draggableCancel=".hud-composer-embed, textarea, input, button, select, .hud-link, a, video, img, [role='slider']"
       >
         <div key="about" className="hud-panel hud-tile hud-tile--about">
           <GridTileFrame title="About" owner={Boolean(isOwner)} />
