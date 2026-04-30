@@ -24,24 +24,26 @@ npx hardhat test
 ## Deploy (example)
 
 ```bash
-# Local / CI (no on-chain deploy)
-npx hardhat run scripts/deploy.ts --network hardhat
+cd contracts
+npm install
 
-# Base Sepolia — fund the deployer address with Sepolia ETH on Base first, then either:
-#   • cp .env.example .env  → set DEPLOYER_PRIVATE_KEY=0x…
-#   • or PowerShell: $env:DEPLOYER_PRIVATE_KEY='0x…'; npx hardhat run scripts/deploy.ts --network baseSepolia
+# 1) Create contracts/.env with a NEW key (never printed — only the address is shown). Fund that address on Base Sepolia.
+npm run gen:deployer
 
-npx hardhat run scripts/deploy.ts --network baseSepolia
+# 2) Deploy token + emissions (reads DEPLOYER_PRIVATE_KEY from .env via dotenv)
+npm run deploy:base
+
+# Writes deployments/baseSepolia.json (gitignored) — addresses only, no private key.
+
+# 3) Push addresses into Netlify production build env (from repo root; netlify CLI logged in)
+cd ..
+npm run netlify:sync-token --prefix contracts
+
+# 4) Trigger a new Netlify production deploy so Vite bakes in VITE_TOKEN_*.
+
+# Local / CI simulation (no chain)
+npm run deploy:local   # hardhat in-memory; writes deployments/hardhat.json
 ```
-
-Then set **Netlify** (or `netlify env:set`) with the printed addresses:
-
-```bash
-netlify env:set VITE_TOKEN_ADDRESS "0x…YourDirecTToken…" --context production
-netlify env:set VITE_EMISSIONS_ADDRESS "0x…YourEmissions…" --context production
-```
-
-Prints addresses for `VITE_TOKEN_ADDRESS` and `VITE_EMISSIONS_ADDRESS` for the web app.
 
 ## Merkle claims
 

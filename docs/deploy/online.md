@@ -133,6 +133,8 @@ In **Site configuration → Environment variables → Builds**, add:
 | `VITE_TOKEN_ADDRESS` | DirecTToken `0x…` after deploy (enables **DIR** balance in Wallet UI) |
 | `VITE_EMISSIONS_ADDRESS` | EmissionsController `0x…` after deploy (for future claim flows / docs) |
 
+**Local flow (recommended):** keep the deployer **private key** only in `contracts/.env` (never committed). From `contracts/`: `npm run gen:deployer` → fund the printed address → `npm run deploy:base` → from repo root `npm run netlify:sync-token --prefix contracts`. See [`contracts/README.md`](../../contracts/README.md).
+
 Redeploy after changing env vars (Vite bakes them in at build time).
 
 ### SPA routing

@@ -1,4 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
 import { ethers } from "hardhat";
+import hre from "hardhat";
 
 /** 1_000_000_000 DIR — matches DirecTToken.MAX_SUPPLY */
 const GENESIS_SUPPLY = ethers.parseEther("1000000000");
@@ -38,6 +41,27 @@ async function main() {
   console.log("Set frontend: VITE_TOKEN_ADDRESS=" + tokenAddr);
   // eslint-disable-next-line no-console
   console.log("Set frontend: VITE_EMISSIONS_ADDRESS=" + emAddr);
+
+  const deploymentsDir = path.join(__dirname, "..", "deployments");
+  fs.mkdirSync(deploymentsDir, { recursive: true });
+  const net = hre.network.name;
+  const outFile = path.join(deploymentsDir, `${net}.json`);
+  const { chainId } = await ethers.provider.getNetwork();
+  fs.writeFileSync(
+    outFile,
+    JSON.stringify(
+      {
+        network: net,
+        chainId: Number(chainId),
+        DirecTToken: tokenAddr,
+        EmissionsController: emAddr,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  // eslint-disable-next-line no-console
+  console.log("Wrote deployment record:", outFile, "(safe to gitignore — used for netlify sync)");
 }
 
 main().catch((e) => {

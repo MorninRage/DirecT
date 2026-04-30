@@ -2,3 +2,4 @@ node_modules
 cache_hardhat
 artifacts
 .env
+deployments/
