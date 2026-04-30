@@ -17,7 +17,11 @@ export type AccountProfile = {
   location: string;
   /** Profile photo from relay /v1/media/:cid */
   avatarCid?: string | null;
-  /** Page background image from relay /v1/media/:cid */
+  /** Banner image behind the profile header on /u/:handle */
+  headerCid?: string | null;
+  /** Full-page background behind the draggable homepage grid */
+  pageBackgroundCid?: string | null;
+  /** @deprecated Use headerCid; relay maps this to header for old clients */
   coverCid?: string | null;
   socialLinks: Record<string, string>;
   settings: {

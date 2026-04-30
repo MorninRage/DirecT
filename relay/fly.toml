@@ -1,6 +1,7 @@
 # DirecT relay API — https://fly.io/docs
 # GitHub: MorninRage/DirecT — deploy from relay/:  fly launch (first time)  then  fly deploy
 #
+# Persisted on volume (/data): relay-state.json (accounts), events-state.json (posts/events), media/ (uploads).
 # If this app name is taken globally, pick another and update netlify.toml VITE_RELAY_URL to match.
 # After first deploy:  fly secrets set CHAIN_ID=84532 INDEXER_SECRET=your-long-random-secret
 

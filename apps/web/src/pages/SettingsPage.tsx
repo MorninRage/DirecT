@@ -29,6 +29,11 @@ export function SettingsPage() {
       communityFeedUnlocked: false,
     };
     d.settings = { ...defaults, ...d.settings };
+    if (d.headerCid === undefined && d.coverCid != null) {
+      d.headerCid = d.coverCid;
+    }
+    if (d.pageBackgroundCid === undefined) d.pageBackgroundCid = null;
+    delete d.coverCid;
     setDraft(d);
   }, [profile]);
 
@@ -82,7 +87,10 @@ export function SettingsPage() {
     }
   };
 
-  const uploadCoverOrAvatar = async (file: File | undefined, field: "avatarCid" | "coverCid") => {
+  const uploadProfileImage = async (
+    file: File | undefined,
+    field: "avatarCid" | "headerCid" | "pageBackgroundCid",
+  ) => {
     if (!file || !token || !draft) return;
     setImgBusy(true);
     setStatus("Uploading image…");
@@ -91,7 +99,9 @@ export function SettingsPage() {
       const next = await apiPatchProfile(token, { [field]: up.cid });
       setDraft(next);
       await refresh();
-      setStatus(field === "avatarCid" ? "Profile photo saved." : "Page background saved.");
+      const label =
+        field === "avatarCid" ? "Profile photo saved." : field === "headerCid" ? "Header banner saved." : "Page background saved.";
+      setStatus(label);
     } catch (e) {
       setStatus(e instanceof Error ? e.message : String(e));
     } finally {
@@ -133,9 +143,10 @@ export function SettingsPage() {
           <label className="hud-label">Location</label>
           <input className="hud-input" value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} />
 
-          <div className="hud-label">Profile & page images</div>
+          <div className="hud-label">Profile & homepage images</div>
           <p style={{ margin: 0, fontSize: 13, color: "var(--hud-dim)", lineHeight: 1.5 }}>
-            Shown on your public page. Anyone visiting <strong>/u/{profile.handle}</strong> sees your photo and background.
+            <strong>Header banner</strong> sits behind the profile strip (name, avatar, bio). <strong>Page background</strong> is the full area
+            behind the draggable tiles — separate from the header. All visible on <strong>/u/{profile.handle}</strong>.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start", marginTop: 8 }}>
             <div>
@@ -156,14 +167,14 @@ export function SettingsPage() {
                 type="file"
                 accept="image/*"
                 disabled={imgBusy}
-                onChange={(e) => void uploadCoverOrAvatar(e.target.files?.[0], "avatarCid")}
+                onChange={(e) => void uploadProfileImage(e.target.files?.[0], "avatarCid")}
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, marginBottom: 6 }}>Page background</div>
-              {draft.coverCid ? (
+              <div style={{ fontSize: 12, marginBottom: 6 }}>Header banner</div>
+              {draft.headerCid ? (
                 <img
-                  src={`${RELAY}/v1/media/${draft.coverCid}`}
+                  src={`${RELAY}/v1/media/${draft.headerCid}`}
                   alt=""
                   style={{ width: 160, height: 72, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8 }}
                 />
@@ -177,7 +188,28 @@ export function SettingsPage() {
                 type="file"
                 accept="image/*"
                 disabled={imgBusy}
-                onChange={(e) => void uploadCoverOrAvatar(e.target.files?.[0], "coverCid")}
+                onChange={(e) => void uploadProfileImage(e.target.files?.[0], "headerCid")}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 6 }}>Page background (behind grid)</div>
+              {draft.pageBackgroundCid ? (
+                <img
+                  src={`${RELAY}/v1/media/${draft.pageBackgroundCid}`}
+                  alt=""
+                  style={{ width: 160, height: 72, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8 }}
+                />
+              ) : (
+                <div className="hud-mono" style={{ fontSize: 12, color: "var(--hud-dim)", marginBottom: 8 }}>
+                  None
+                </div>
+              )}
+              <input
+                className="hud-input"
+                type="file"
+                accept="image/*"
+                disabled={imgBusy}
+                onChange={(e) => void uploadProfileImage(e.target.files?.[0], "pageBackgroundCid")}
               />
             </div>
           </div>

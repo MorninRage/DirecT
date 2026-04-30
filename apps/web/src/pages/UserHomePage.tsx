@@ -158,8 +158,24 @@ export function UserHomePage() {
   }
   if (!pub) return <div className="hud-panel">Loading…</div>;
 
+  const headerImage = pub.headerCid ?? pub.coverCid ?? null;
+  const pageBgImage = pub.pageBackgroundCid ?? null;
+
   return (
-    <div ref={containerRef} className="hud-home hud-home-layout">
+    <div
+      ref={containerRef}
+      className="hud-home hud-home-layout"
+      style={
+        pageBgImage
+          ? {
+              backgroundImage: `linear-gradient(rgba(6, 10, 18, 0.45), rgba(6, 10, 18, 0.65)), url(${RELAY}/v1/media/${pageBgImage})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "repeat-y",
+            }
+          : undefined
+      }
+    >
       {isOwner ? (
         <div className="hud-home-hint hud-panel hud-panel--hint">
           <div className="hud-home-hint__title">Arrange your page</div>
@@ -175,9 +191,9 @@ export function UserHomePage() {
         style={{
           position: "relative",
           overflow: "hidden",
-          ...(pub.coverCid
+          ...(headerImage
             ? {
-                backgroundImage: `linear-gradient(rgba(6,10,18,0.82), rgba(6,10,18,0.92)), url(${RELAY}/v1/media/${pub.coverCid})`,
+                backgroundImage: `linear-gradient(rgba(6,10,18,0.82), rgba(6,10,18,0.92)), url(${RELAY}/v1/media/${headerImage})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }

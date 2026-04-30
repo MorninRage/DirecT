@@ -17,6 +17,13 @@ import {
   updateProfile,
   type AccountProfile,
 } from "./accounts.js";
+import {
+  loadEventsFromDisk,
+  loadMediaBlobFromDisk,
+  persistEventsNow,
+  persistMediaBlob,
+  schedulePersistEvents,
+} from "./persistEvents.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? 84532);
@@ -66,6 +73,13 @@ const events = new Map<string, SignedEvent>();
 const metrics = new Map<string, Metrics>();
 const mediaBlobs = new Map<string, { mime: string; data: Buffer }>();
 
+loadEventsFromDisk(events, metrics);
+
+process.on("SIGTERM", () => {
+  persistEventsNow(events, metrics);
+  process.exit(0);
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 60 * 1024 * 1024 },
@@ -110,6 +124,11 @@ app.post("/v1/media", upload.single("file"), (req, res) => {
     const bytes = new Uint8Array(req.file.buffer);
     const cid = keccak256(bytes).toLowerCase();
     mediaBlobs.set(cid, { mime: req.file.mimetype || "application/octet-stream", data: req.file.buffer });
+    try {
+      persistMediaBlob(cid, req.file.mimetype || "application/octet-stream", req.file.buffer);
+    } catch (persistErr) {
+      console.error("[relay] media disk persist failed:", persistErr);
+    }
     return res.status(201).json({ cid, mime: req.file.mimetype, size: req.file.size });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "upload_failed";
@@ -120,10 +139,19 @@ app.post("/v1/media", upload.single("file"), (req, res) => {
 app.get("/v1/media/:cid", (req, res) => {
   const cid = req.params.cid.toLowerCase();
   const blob = mediaBlobs.get(cid);
-  if (!blob) return res.status(404).json({ error: "not_found" });
-  res.setHeader("Content-Type", blob.mime);
-  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-  return res.send(blob.data);
+  if (blob) {
+    res.setHeader("Content-Type", blob.mime);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.send(blob.data);
+  }
+  const fromDisk = loadMediaBlobFromDisk(cid);
+  if (fromDisk) {
+    mediaBlobs.set(cid, fromDisk);
+    res.setHeader("Content-Type", fromDisk.mime);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.send(fromDisk.data);
+  }
+  return res.status(404).json({ error: "not_found" });
 });
 
 app.post("/v1/events", async (req, res) => {
@@ -152,6 +180,7 @@ app.post("/v1/events", async (req, res) => {
         applyEngagement(ro, { type: "share" });
       }
     }
+    schedulePersistEvents(events, metrics);
     return res.status(201).json({ eid: key, type });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "invalid_event";
@@ -258,6 +287,7 @@ app.post("/v1/events/:eid/view", (req, res) => {
   const m = getMetrics(req.params.eid.toLowerCase());
   const n = Number((req.body as { count?: number })?.count ?? 1);
   m.views += Number.isFinite(n) ? n : 1;
+  schedulePersistEvents(events, metrics);
   return res.json(m);
 });
 
@@ -336,6 +366,10 @@ app.patch("/v1/accounts/me", (req, res) => {
   if (!handle) return;
   try {
     const patch = req.body as Record<string, unknown>;
+    if ("coverCid" in patch) {
+      patch.headerCid = patch.coverCid;
+      delete patch.coverCid;
+    }
     const { password: _pw, ...safe } = patch;
     const prof = updateProfile(handle, safe as Partial<AccountProfile>);
     return res.json(prof);

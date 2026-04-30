@@ -62,8 +62,10 @@ export type AccountProfile = {
   location: string;
   /** Keccak content id from POST /v1/media (profile photo). */
   avatarCid?: string | null;
-  /** Keccak content id from POST /v1/media (page background). */
-  coverCid?: string | null;
+  /** Banner behind the profile header strip on /u/:handle. */
+  headerCid?: string | null;
+  /** Full-page background behind the draggable homepage grid. */
+  pageBackgroundCid?: string | null;
   socialLinks: Record<string, string>;
   settings: {
     compactFeed: boolean;
@@ -134,7 +136,8 @@ export function defaultProfile(handle: string, displayName?: string): AccountPro
     profession: "",
     location: "",
     avatarCid: null,
-    coverCid: null,
+    headerCid: null,
+    pageBackgroundCid: null,
     socialLinks: {},
     settings: defaultAccountSettings(),
     layout: {
@@ -196,30 +199,46 @@ export function getPublicProfile(handle: string): AccountProfile | null {
   const p = structuredClone(acc.profile);
   p.settings = { ...defaultAccountSettings(), ...p.settings };
   if (p.avatarCid === undefined) p.avatarCid = null;
-  if (p.coverCid === undefined) p.coverCid = null;
+  const legacyCover = (p as { coverCid?: string | null }).coverCid;
+  if (p.headerCid === undefined) {
+    p.headerCid = legacyCover ?? null;
+  }
+  if (p.pageBackgroundCid === undefined) p.pageBackgroundCid = null;
+  delete (p as { coverCid?: unknown }).coverCid;
   return p;
 }
 
 export function updateProfile(handle: string, patch: Partial<AccountProfile>): AccountProfile {
   const acc = accounts.get(handle.toLowerCase());
   if (!acc) throw new Error("not_found");
+  const rawPatch = patch as Partial<AccountProfile> & { coverCid?: string | null };
+  if ("coverCid" in rawPatch && rawPatch.headerCid === undefined) {
+    rawPatch.headerCid = rawPatch.coverCid;
+  }
+  delete rawPatch.coverCid;
+  const patch2 = rawPatch as Partial<AccountProfile>;
+  const prev = acc.profile as AccountProfile & { coverCid?: string | null };
+  const headerFallback = prev.headerCid ?? prev.coverCid ?? null;
   const next: AccountProfile = {
     ...acc.profile,
-    ...patch,
+    ...patch2,
     handle: acc.profile.handle,
-    avatarCid: patch.avatarCid !== undefined ? patch.avatarCid : acc.profile.avatarCid ?? null,
-    coverCid: patch.coverCid !== undefined ? patch.coverCid : acc.profile.coverCid ?? null,
-    settings: { ...defaultAccountSettings(), ...acc.profile.settings, ...patch.settings },
-    socialLinks: { ...acc.profile.socialLinks, ...patch.socialLinks },
-    layout: patch.layout
+    avatarCid: patch2.avatarCid !== undefined ? patch2.avatarCid : acc.profile.avatarCid ?? null,
+    headerCid: patch2.headerCid !== undefined ? patch2.headerCid : headerFallback,
+    pageBackgroundCid:
+      patch2.pageBackgroundCid !== undefined ? patch2.pageBackgroundCid : acc.profile.pageBackgroundCid ?? null,
+    settings: { ...defaultAccountSettings(), ...acc.profile.settings, ...patch2.settings },
+    socialLinks: { ...acc.profile.socialLinks, ...patch2.socialLinks },
+    layout: patch2.layout
       ? {
-          cols: patch.layout.cols ?? acc.profile.layout.cols,
-          rowHeight: patch.layout.rowHeight ?? acc.profile.layout.rowHeight,
-          items: patch.layout.items ?? acc.profile.layout.items,
+          cols: patch2.layout.cols ?? acc.profile.layout.cols,
+          rowHeight: patch2.layout.rowHeight ?? acc.profile.layout.rowHeight,
+          items: patch2.layout.items ?? acc.profile.layout.items,
         }
       : acc.profile.layout,
-    linkedWallets: patch.linkedWallets ?? acc.profile.linkedWallets,
+    linkedWallets: patch2.linkedWallets ?? acc.profile.linkedWallets,
   };
+  delete (next as { coverCid?: unknown }).coverCid;
   acc.profile = next;
   persistAccountsState();
   return structuredClone(next);
