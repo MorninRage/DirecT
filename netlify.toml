@@ -9,18 +9,21 @@
 # Relay (Fly) for production API:
 #   https://morninrage-direct-relay.fly.dev  (see relay/fly.toml — set Fly secrets, do not commit)
 #
-# Build env (mirrored below; override in Netlify UI for production secrets):
-#   VITE_RELAY_URL, VITE_CHAIN_ID, VITE_RPC_URL — required
-#   VITE_TOKEN_ADDRESS, VITE_EMISSIONS_ADDRESS — required for DIR balance + /claim (Merkle rewards UI)
+# Build env: values here are baked into the Vite build. Netlify UI env vars override/extend these per branch.
+#   Committed below: relay URL + chain + public RPC (sanity default for Git-linked builds).
+#   Not committed (set in Netlify UI or via `npm run netlify:sync-token --prefix contracts`): contract addresses.
+#   VITE_RELAY_URL, VITE_CHAIN_ID, VITE_RPC_URL — required for any build
+#   VITE_TOKEN_ADDRESS, VITE_EMISSIONS_ADDRESS — required for DIR balance in Wallet + /claim (sync after deploy)
 #
-# After deploying contracts to Base Sepolia (`contracts/scripts/deploy.ts`), ensure Netlify has token + emissions
-# addresses (or run contracts npm run netlify:sync-token / ship:online). Redeploy after env changes.
+# Deploy sync: when Fly app name or relay URL changes, update root netlify.toml, docs/deploy/current-environment.md,
+# README.md, and comments in relay/fly.toml (see .github/README.md checklist).
+#
+# After deploying contracts (`contracts/scripts/deploy.ts`), run netlify:sync-token or ship:online, then redeploy web.
 
+# Build from repo root so CLI + Netlify Git resolve the same publish folder (apps/web/dist).
 [build]
-  # base = package root; publish is relative to base (not repo root) — see Netlify monorepo + file-based config docs.
-  base = "apps/web"
-  command = "npm run build"
-  publish = "dist"
+  command = "npm ci --prefix apps/web && npm run build --prefix apps/web"
+  publish = "apps/web/dist"
 
 [[redirects]]
   from = "/*"

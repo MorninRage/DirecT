@@ -34,6 +34,7 @@ import {
   assertRootActiveAndNotClaimed,
   loadSponsoredClaimConfig,
   pickBeneficiaryForClaim,
+  sponsoredClaimEnvDiagnostics,
   submitSponsoredClaim,
 } from "./sponsoredClaim.js";
 import { listRecentFollowsForTarget } from "./followActivity.js";
@@ -88,19 +89,38 @@ app.use(express.json({ limit: "4mb" }));
 
 
 app.get("/health", (_req, res) => {
+  const diag = sponsoredClaimEnvDiagnostics();
   res.json({
     ok: true,
     service: "direct-relay",
     chainId: CHAIN_ID,
     sponsoredClaim: Boolean(loadSponsoredClaimConfig()),
+    sponsoredClaimDiagnostics: diag,
   });
 });
 
 const events = new Map<string, SignedEvent>();
 const metrics = new Map<string, Metrics>();
 const mediaBlobs = new Map<string, { mime: string; data: Buffer }>();
+/** Target post/repost eids removed from public feeds (via signed `post_delete` events). */
+const deletedPostEids = new Set<string>();
+
+function rebuildDeletedPostEids(): void {
+  deletedPostEids.clear();
+  for (const env of events.values()) {
+    const b = env.event.body as { type?: string; target_eid?: string };
+    if (String(b.type ?? "") !== "post_delete") continue;
+    const t = typeof b.target_eid === "string" ? b.target_eid.toLowerCase() : "";
+    if (t.startsWith("0x")) deletedPostEids.add(t);
+  }
+}
+
+function isPostDeleted(eid: string): boolean {
+  return deletedPostEids.has(eid.toLowerCase());
+}
 
 loadEventsFromDisk(events, metrics);
+rebuildDeletedPostEids();
 loadRewardEpochs();
 
 process.on("SIGTERM", () => {
@@ -192,12 +212,36 @@ app.post("/v1/events", async (req, res) => {
       return res.status(409).json({ error: "duplicate_eid", eid: key });
     }
     const body = envelope.event.body as Record<string, unknown>;
+    const type = String(body.type ?? "");
+
+    if (type === "post_delete") {
+      const target = String(body.target_eid ?? "").toLowerCase();
+      if (!target.startsWith("0x")) {
+        return res.status(400).json({ error: "invalid_target_eid" });
+      }
+      const parent = events.get(target);
+      if (!parent) {
+        return res.status(400).json({ error: "unknown_target_post" });
+      }
+      const pb = parent.event.body as { type?: string };
+      const pt = String(pb.type ?? "");
+      if (pt !== "post" && pt !== "repost") {
+        return res.status(400).json({ error: "invalid_delete_target" });
+      }
+      if (parent.event.header.author.toLowerCase() !== signer.toLowerCase()) {
+        return res.status(403).json({ error: "not_post_author" });
+      }
+    }
+
     const dh = body.direct_handle;
     if (typeof dh === "string" && dh.trim()) {
       assertWalletLinkedToHandle(dh, signer);
     }
     events.set(key, envelope);
-    const type = String(body.type ?? "");
+    if (type === "post_delete") {
+      const target = String(body.target_eid ?? "").toLowerCase();
+      deletedPostEids.add(target);
+    }
     const parentRaw = body.reply_to;
     if (typeof parentRaw === "string" && parentRaw.startsWith("0x")) {
       applyEngagement(parentRaw, body);
@@ -221,7 +265,9 @@ app.post("/v1/events", async (req, res) => {
 });
 
 app.get("/v1/events/:eid", (req, res) => {
-  const ev = events.get(req.params.eid.toLowerCase());
+  const raw = req.params.eid.toLowerCase();
+  if (isPostDeleted(raw)) return res.status(404).json({ error: "not_found" });
+  const ev = events.get(raw);
   if (!ev) return res.status(404).json({ error: "not_found" });
   return res.json(ev);
 });
@@ -229,7 +275,15 @@ app.get("/v1/events/:eid", (req, res) => {
 app.get("/v1/authors/:address/events", (req, res) => {
   const addr = req.params.address.toLowerCase();
   const list = [...events.values()]
-    .filter((e) => e.event.header.author.toLowerCase() === addr)
+    .filter((e) => {
+      if (e.event.header.author.toLowerCase() !== addr) return false;
+      const eid = computeEid(e).toLowerCase();
+      const b = e.event.body as { type?: string };
+      const t = String(b.type ?? "");
+      if (t === "post_delete") return false;
+      if ((t === "post" || t === "repost") && isPostDeleted(eid)) return false;
+      return true;
+    })
     .map((e) => ({ eid: computeEid(e).toLowerCase(), ...e.event.header, body: e.event.body }))
     .sort((a, b) => b.timestamp - a.timestamp);
   return res.json(list);
@@ -245,6 +299,7 @@ function originalFeedSnapshot(origEidRaw: string):
     }
   | null {
   const origEid = origEidRaw.toLowerCase();
+  if (isPostDeleted(origEid)) return null;
   const env = events.get(origEid);
   if (!env) return null;
   const body = env.event.body as {
@@ -302,9 +357,10 @@ app.get("/v1/feed", (req, res) => {
     followingSet = new Set(listFollowingOf(fh));
   }
   const list = [...events.entries()]
-    .filter(([, env]) => {
+    .filter(([eid, env]) => {
       const t = String((env.event.body as { type?: string }).type ?? "");
-      return t === "post" || t === "repost";
+      if (t !== "post" && t !== "repost") return false;
+      return !isPostDeleted(eid);
     })
     .filter(([, env]) => {
       if (!hraw) return true;
@@ -622,6 +678,10 @@ app.get("/v1/posts/:eid/comments", (req, res) => {
       author: e.event.header.author,
       timestamp: e.event.header.timestamp,
       text: String((e.event.body as { text?: string }).text ?? ""),
+      direct_handle: (() => {
+        const dh = (e.event.body as { direct_handle?: string }).direct_handle;
+        return typeof dh === "string" && dh.trim() ? dh : null;
+      })(),
     }))
     .sort((a, b) => a.timestamp - b.timestamp);
   return res.json(list);

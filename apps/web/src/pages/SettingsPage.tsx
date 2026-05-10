@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { useAccountProfile } from "../auth/AccountProvider";
-import { apiLinkWallet, apiLinkWalletChallenge, apiPatchProfile } from "../api/relayAccounts";
+import { apiPatchProfile } from "../api/relayAccounts";
 import type { AccountProfile } from "../types/account";
-import { useOpenWalletHub } from "../components/walletHubContext";
 import { uploadMedia } from "../lib/submitEvent";
 import { RELAY } from "../config";
 
@@ -12,8 +11,7 @@ const LINK_KEYS = ["website", "twitter", "x", "instagram", "github", "youtube", 
 
 export function SettingsPage() {
   const { token, profile, refresh, logout } = useAccountProfile();
-  const { address, mode, signUtf8Message } = useDirectAuth();
-  const openWalletHub = useOpenWalletHub();
+  const { address } = useDirectAuth();
   const [draft, setDraft] = useState<AccountProfile | null>(null);
   const [status, setStatus] = useState("");
   const [imgBusy, setImgBusy] = useState(false);
@@ -72,24 +70,6 @@ export function SettingsPage() {
     }
   };
 
-  const linkWallet = async () => {
-    if (!address) {
-      setStatus("Set up a signing wallet first (button below).");
-      return;
-    }
-    setStatus("Linking wallet…");
-    try {
-      const { message } = await apiLinkWalletChallenge(token);
-      const signature = await signUtf8Message(message);
-      await apiLinkWallet(token, address, message, signature);
-      await refresh();
-      setDraft((d) => (d ? { ...d, linkedWallets: [...new Set([...d.linkedWallets, address.toLowerCase()])] } : d));
-      setStatus("Wallet linked.");
-    } catch (e) {
-      setStatus(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   const uploadProfileImage = async (
     file: File | undefined,
     field: "avatarCid" | "headerCid" | "pageBackgroundCid",
@@ -112,8 +92,29 @@ export function SettingsPage() {
     }
   };
 
+  const walletLinkPath = address
+    ? `/direct/${address}`
+    : profile.linkedWallets[0]
+      ? `/direct/${profile.linkedWallets[0]}`
+      : null;
+
   return (
     <div>
+      <section className="hud-panel" style={{ marginBottom: 16 }}>
+        <div className="hud-label">Wallet and signing</div>
+        <p style={{ margin: 0, fontSize: 14, color: "var(--hud-dim)", lineHeight: 1.55 }}>
+          Connect a signer, copy your shareable address URL, and link it to @{profile.handle} on the{" "}
+          {walletLinkPath ? (
+            <Link className="hud-link" to={walletLinkPath}>
+              Wallet link
+            </Link>
+          ) : (
+            <span>Wallet link</span>
+          )}{" "}
+          page (open <strong>Wallet</strong> in the top bar if you do not have an address yet).
+        </p>
+      </section>
+
       <section className="hud-panel">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
@@ -297,28 +298,6 @@ export function SettingsPage() {
           </button>
           <span className="hud-mono">{status}</span>
         </div>
-      </section>
-
-      <section className="hud-panel" style={{ marginTop: 16 }}>
-        <div className="hud-label">Signing wallet linkage</div>
-        <p style={{ color: "var(--hud-dim)", marginTop: 0, lineHeight: 1.55 }}>
-          Link the address you use to sign posts. Required if you want posts to carry <strong>@{profile.handle}</strong> and pass relay checks.
-          Use the top bar <strong>Wallet</strong> button to connect MetaMask / Coinbase or generate an embedded signing key (session-only).
-        </p>
-        <div className="hud-mono" style={{ marginBottom: 10 }}>
-          Signing address: {address ?? "none"} {address ? `(${mode})` : null}
-        </div>
-        <div className="hud-mono" style={{ marginBottom: 10 }}>
-          Linked: {profile.linkedWallets.length ? profile.linkedWallets.join(", ") : "none"}
-        </div>
-        {!address ? (
-          <button type="button" className="hud-btn hud-btn--primary" style={{ marginBottom: 10 }} onClick={() => openWalletHub()}>
-            Connect or create signing wallet…
-          </button>
-        ) : null}
-        <button type="button" className="hud-btn hud-btn--primary" onClick={() => void linkWallet()} disabled={!address}>
-          Sign message & link wallet
-        </button>
       </section>
     </div>
   );

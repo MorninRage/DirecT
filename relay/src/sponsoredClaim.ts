@@ -14,6 +14,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import type { AccountProfile } from "./accounts.js";
+import { preferredMerkleBeneficiary } from "./rewardBeneficiary.js";
 import type { PublishedRewardEpoch } from "./rewardsEpochs.js";
 
 /** Matches EmissionsController leaf hashing. */
@@ -102,6 +103,12 @@ export function pickBeneficiaryForClaim(
     const found = matches.find((m) => m.beneficiary.toLowerCase() === want);
     if (!found) throw new Error("beneficiary_not_in_epoch_for_profile");
     row = found;
+  } else {
+    const pref = preferredMerkleBeneficiary(profile);
+    if (pref) {
+      const found = matches.find((m) => m.beneficiary.toLowerCase() === pref.toLowerCase());
+      if (found) row = found;
+    }
   }
 
   const tree = buildTree(epoch.allocations);
@@ -120,6 +127,22 @@ export type SponsoredClaimConfig = {
   rpcUrl: string;
   chain: Chain;
 };
+
+export function sponsoredClaimEnvDiagnostics(): {
+  relayerKeyPresent: boolean;
+  relayerKeyFormatOk: boolean;
+  emissionsPresent: boolean;
+  emissionsFormatOk: boolean;
+} {
+  const rawPk = process.env.RELAYER_PRIVATE_KEY?.trim();
+  const rawEm = process.env.EMISSIONS_ADDRESS?.trim();
+  return {
+    relayerKeyPresent: Boolean(rawPk),
+    relayerKeyFormatOk: Boolean(rawPk && /^0x[0-9a-fA-F]{64}$/.test(rawPk)),
+    emissionsPresent: Boolean(rawEm),
+    emissionsFormatOk: Boolean(rawEm && /^0x[0-9a-fA-F]{40}$/.test(rawEm)),
+  };
+}
 
 export function loadSponsoredClaimConfig(): SponsoredClaimConfig | null {
   const rawPk = process.env.RELAYER_PRIVATE_KEY?.trim();

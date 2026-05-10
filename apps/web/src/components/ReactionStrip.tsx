@@ -1,4 +1,4 @@
-import { EMOTIONS, type Emotion } from "../reactions";
+import { EMOTIONS, EMOTION_EMOJI, type Emotion } from "../reactions";
 
 export function ReactionStrip({
   disabled,
@@ -20,8 +20,17 @@ export function ReactionStrip({
       }}
     >
       {EMOTIONS.map((e) => (
-        <button key={e} type="button" className="hud-btn" style={{ fontSize: 10, padding: "4px 8px" }} disabled={disabled} onClick={() => onReact(e)}>
-          {e}
+        <button
+          key={e}
+          type="button"
+          className="hud-btn hud-btn--reaction"
+          style={{ fontSize: 18, padding: "6px 10px", lineHeight: 1 }}
+          title={e}
+          disabled={disabled}
+          onClick={() => onReact(e)}
+        >
+          <span aria-hidden>{EMOTION_EMOJI[e]}</span>
+          <span className="hud-sr-only">{e}</span>
         </button>
       ))}
     </div>

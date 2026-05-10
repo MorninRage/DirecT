@@ -32,6 +32,8 @@ This section answers the most common confusion: **nobody “mines” the first D
 
 > **Testnet today:** A **Base Sepolia** deployment is **live** (treasury mint + rewards pool on `EmissionsController`). Exact addresses and hosting URLs are summarized in [`../deploy/current-environment.md`](../deploy/current-environment.md). Creator **claims** still require Merkle roots + UI or external tooling—see MVP **M3**.
 
+> **Mainnet later:** New contract deploy on Base (`8453`); Sepolia balances do not auto-migrate. To credit beta users with **the same Merkle `claim` flow**, use a **genesis mainnet epoch** built from a frozen snapshot—see [`../deploy/testnet-to-mainnet-roadmap.md`](../deploy/testnet-to-mainnet-roadmap.md) §4.
+
 **Analogy — festival tickets:** The venue **prints a fixed number of tickets** before the show. Some go to **staff**, some to **sponsors**, some are held for **door prizes**, some for **fans** to buy. **Winning a guitar solo contest** does not print new cardboard; it decides who receives tickets **from the prize stash**.
 
 ### 2.2 Terms you need for “where coins come from”

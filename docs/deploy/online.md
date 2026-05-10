@@ -120,9 +120,8 @@ You should see JSON with `"ok": true`.
 1. Netlify dashboard → **Add new site** → **Import an existing project**.
 2. Connect Git provider → select **this repo**.
 3. Netlify reads **root** [`netlify.toml`](../../netlify.toml):
-   - **Base directory:** `apps/web` (set via `base`)
-   - **Build command:** `npm run build`
-   - **Publish directory:** `dist` (relative to **base** `apps/web`; Netlify deploys `apps/web/dist`)
+   - **Build:** `npm ci` + `npm run build` with `--prefix apps/web`
+   - **Publish directory:** `apps/web/dist` (path from repository root)
 
 ### Build environment variables (required)
 
@@ -156,7 +155,7 @@ If you use **Netlify MCP** in Cursor, mirror the same settings (build base `apps
 
 The relay uses `cors()` wide open — acceptable for early demos. Before mainnet-style launch, restrict origins to your Netlify domain:
 
-- e.g. set `origin: ["https://your-site.netlify.app"]` in relay — code change not yet in repo.
+Before **Base mainnet** and **beta user credits**, read [testnet-to-mainnet-roadmap.md](testnet-to-mainnet-roadmap.md) (not just env flips).
 
 ---
 
@@ -164,7 +163,7 @@ The relay uses `cors()` wide open — acceptable for early demos. Before mainnet
 
 1. `fly deploy` → `curl https://<relay>.fly.dev/health` OK.  
 2. Netlify build green with `VITE_RELAY_URL` = that relay URL.  
-3. Open Netlify URL → sign up → **Wallet** (modal scrolls; **Close** / **×** / backdrop / Esc) → link address in Settings → post on My page → optional **Rewards** if an epoch is published.  
+3. Open Netlify URL → sign up → **Wallet** (modal) → **Wallet link** page → sign message and link wallet → post on **My page** → optional **Rewards** if an epoch is published. (Profile fields remain under **Settings**.)  
 4. Optional: second browser / incognito → confirm public `/u/:handle` loads.  
 
 ---
@@ -187,4 +186,4 @@ The relay uses `cors()` wide open — acceptable for early demos. Before mainnet
 - [`mvp-scope.md`](../mvp-scope.md) — what “done” means for the product loop.  
 - [`protocol/README.md`](../protocol/README.md) — API paths the relay exposes.  
 - Fly: [Deploy an app](https://fly.io/docs/getting-started/launch-remix/) pattern matches Docker deploy.  
-- Netlify: [Monorepos](https://docs.netlify.com/configure-builds/monorepos/) — `base` in `netlify.toml` handles `apps/web`.
+- Netlify: build runs from the **repository root** with `npm ci --prefix apps/web && npm run build --prefix apps/web` and publish dir **`apps/web/dist`** (see root `netlify.toml`). This is not the `[build] base = "apps/web"` monorepo pattern; either approach is valid, but this repo uses root-scoped commands.

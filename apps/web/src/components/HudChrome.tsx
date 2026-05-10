@@ -1,12 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
 import { appChain } from "../chains";
 import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { useAccountProfile } from "../auth/AccountProvider";
+import { useHud3dEnabled } from "../hooks/useHud3dEnabled";
 import { AccessHub } from "./AccessHub";
 import { NotificationBell } from "./NotificationBell";
 import { OpenWalletHubContext } from "./walletHubContext";
+
+const HudScene = lazy(() => import("../scene/HudScene").then((m) => ({ default: m.HudScene })));
 
 export function HudChrome({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -40,7 +43,11 @@ export function HudChrome({ children }: { children: ReactNode }) {
   }, [profile]);
 
   const wrongChain = mode === "wallet" && isConnected && chainId !== undefined && chainId !== appChain.id;
-  const directLink = address ? `/direct/${address}` : null;
+  const walletLinkPath = address
+    ? `/direct/${address}`
+    : profile?.linkedWallets?.[0]
+      ? `/direct/${profile.linkedWallets[0]}`
+      : null;
   const myPage = profile ? `/u/${profile.handle}` : null;
 
   const disconnectWallet = async () => {
@@ -48,8 +55,15 @@ export function HudChrome({ children }: { children: ReactNode }) {
     await disconnectAsync().catch(() => undefined);
   };
 
+  const show3d = useHud3dEnabled(profile);
+
   return (
     <>
+      {show3d ? (
+        <Suspense fallback={null}>
+          <HudScene />
+        </Suspense>
+      ) : null}
       <header className="hud-topbar">
         <div className="hud-brand">DirecT</div>
         <div className="hud-top-actions">
@@ -78,10 +92,19 @@ export function HudChrome({ children }: { children: ReactNode }) {
               Settings
             </Link>
           ) : null}
-          {directLink ? (
-            <Link to={directLink} className="hud-btn">
+          {walletLinkPath ? (
+            <Link to={walletLinkPath} className="hud-btn">
               Wallet link
             </Link>
+          ) : profile ? (
+            <button
+              type="button"
+              className="hud-btn"
+              title="Connect a signing wallet to get your wallet link URL"
+              onClick={() => setOpen(true)}
+            >
+              Wallet link
+            </button>
           ) : null}
           {wrongChain ? (
             <button
@@ -130,7 +153,7 @@ export function HudChrome({ children }: { children: ReactNode }) {
           </>
         ) : address ? (
           <>
-            {mode} · {address.slice(0, 6)}…{address.slice(-4)}
+            {mode === "local" ? "embedded" : mode} · {address.slice(0, 6)}…{address.slice(-4)}
           </>
         ) : (
           "offline"

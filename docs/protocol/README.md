@@ -132,6 +132,8 @@ PDS is **optional in MVP**; default path is client → relay.
 
 **Live testnet:** Base Sepolia deployment snapshot (token + emissions addresses) is documented in [`../deploy/current-environment.md`](../deploy/current-environment.md).
 
+**Testnet → mainnet (same APIs; beta credit policy):** [`../deploy/testnet-to-mainnet-roadmap.md`](../deploy/testnet-to-mainnet-roadmap.md).
+
 ## 7. Versioning
 
 - Bump `schema` field for incompatible body changes.

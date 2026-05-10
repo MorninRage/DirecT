@@ -1,0 +1,33 @@
+{
+  "epochId": "m3-demo-1",
+  "chainId": 84532,
+  "root": "0xe1554f5b06db25cffa9e8bc250a9a6d75ac92840728ea8aaf98710032d1126f7",
+  "builtAtMs": 1777566839667,
+  "poolWei": "10000000000000000000000000",
+  "totalAllocatedWei": "5000000000000000000000",
+  "report": {
+    "policy": {
+      "epochId": "m3-demo-1",
+      "chainId": 84532,
+      "weights": {
+        "reactions": 1,
+        "comments": 3,
+        "shares": 2
+      },
+      "perUserCapWei": "5000000000000000000000",
+      "poolWei": null,
+      "tokenAddress": "0xA02D4D759590ac737916F9Ba88c1AD338a514dCF",
+      "emissionsAddress": "0xD6FCCb66be9B28577a90A11D8A4b1Fd80a7e90a1"
+    },
+    "skippedNoHandleOnPost": [],
+    "skippedNoBeneficiary": [],
+    "skippedZeroScore": []
+  },
+  "allocations": [
+    {
+      "beneficiary": "0x9E58D68650BD56170ac070eE8288FeF383507e60",
+      "amountWei": "5000000000000000000000"
+    }
+  ],
+  "registerTxHash": "0x595ef624b7a1a33cc1df78a0cc418ac7d7afe39012020fb5a6888d48f11c0fd3"
+}

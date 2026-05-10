@@ -2,7 +2,7 @@
 
 **Full narrative (what exists + what’s next):** [status-and-roadmap.md](STATUS-AND-ROADMAP.md)
 
-**Goal:** Prove the loop: **wallet identity → post/read via relay → engagement metrics v0 → testnet DIR payouts.**
+**Goal:** Prove the loop: **wallet identity → post/read via relay → engagement metrics v0 → testnet DIR payouts.** A future **Base mainnet** launch reuses the same Merkle/`claim` stack; preserving beta users’ credited amounts is a **documented snapshot + genesis mainnet epoch**—[deploy/testnet-to-mainnet-roadmap.md](deploy/testnet-to-mainnet-roadmap.md).
 
 ## Current status (April 2026)
 
@@ -13,6 +13,8 @@
 | **M3** Metrics export → Merkle → test payout | **Done (code)** | Operator must run [epoch runbook](deploy/current-environment.md#m3-epoch--claim-runbook) + [publish to relay](deploy/current-environment.md#why-rewards-shows-no-epoch-published-on-the-relay-yet) for users to see Rewards; proves “paid users” on testnet. |
 
 **Live snapshot:** [deploy/current-environment.md](deploy/current-environment.md) (URLs, contract table, `ship:online` script list).
+
+**Mainnet / beta credits:** [deploy/testnet-to-mainnet-roadmap.md](deploy/testnet-to-mainnet-roadmap.md).
 
 ## In scope (MVP)
 

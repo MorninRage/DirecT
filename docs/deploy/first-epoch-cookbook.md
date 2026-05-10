@@ -194,7 +194,7 @@ You should see **`epoch": { ... }`**, not **`null`**.
 ## Step 6 — What creators do (no server access)
 
 1. Open the live site (e.g. Netlify URL).
-2. **Settings** → link the **same wallet** (or set **payout address**) that appears as **`beneficiary`** in **`allocations`**.
+2. **Wallet link** (`/direct/…`, from the top bar once you have a signing address) → **Sign message and link wallet** — use the **same wallet** (or set **payout address** in **Settings**) that appears as **`beneficiary`** in **`allocations`**.
 3. Connect that wallet in the header / **Wallet** dialog.
 4. **Rewards** (`/claim`) → should show the epoch → **Claim** → approve tx on Base Sepolia.
 
@@ -217,5 +217,6 @@ They **never** run **`fly`** or **`build-epoch`**. If their wallet isn’t in th
 ## Related
 
 - Full runbook + env tables: [current-environment.md](current-environment.md)  
+- **Mainnet + beta credits** (same epoch/`claim` pattern): [testnet-to-mainnet-roadmap.md](testnet-to-mainnet-roadmap.md)  
 - API details: [protocol/README.md](../protocol/README.md)  
 - Product context: [STATUS-AND-ROADMAP.md](../STATUS-AND-ROADMAP.md)

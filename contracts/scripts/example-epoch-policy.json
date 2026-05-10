@@ -1,14 +1,14 @@
 {
-  "epochId": "m3-demo-1",
+  "epochId": "m3-demo-2",
   "chainId": 84532,
   "weights": {
     "reactions": 1,
     "comments": 3,
     "shares": 2
   },
-  "perUserCapWei": "10000000000000000000",
+  "perUserCapWei": "10000000000000000000000",
   "poolWei": null,
   "tokenAddress": "0xA02D4D759590ac737916F9Ba88c1AD338a514dCF",
   "emissionsAddress": "0xD6FCCb66be9B28577a90A11D8A4b1Fd80a7e90a1",
-  "notes": "Testnet-friendly defaults. Shim got 5000 DIR before because perUserCapWei was 5000 DIR and the demo used almost the whole emissions balance as one epoch pool. At scale: use --pool-wei set to a small budget per epoch (e.g. daily emissions), not --fetch-pool of the entire treasury; set perUserCapWei to a small fraction of that epoch pool so millions of active users each earn a tiny slice unless content is extreme outliers."
+  "notes": "perUserCapWei = 10,000 DIR (1e22 wei). Shim previously received 5,000 DIR when cap was 5e21 wei in m3-demo-1. Operator flow: fresh GET /v1/indexer/snapshot → build-epoch → epoch:register → POST /v1/admin/rewards-epochs."
 }

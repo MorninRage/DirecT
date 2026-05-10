@@ -1,0 +1,13 @@
+{
+  "id": "m3-demo-2",
+  "root": "0x1a0813ec0eed1f35f29302b1109f41d35974e3bd21d1b8f657038a6389796a23",
+  "chainId": 84532,
+  "publishedAtMs": 1778387645121,
+  "allocations": [
+    {
+      "beneficiary": "0xEF12255d2A4A54275a7B4cF198aE8A95B17Ba8aC",
+      "amountWei": "10000000000000000000000"
+    }
+  ],
+  "registerTxHash": "0x5368bf1d3f2899cb8fd29020d761bbfe34a6fecbda0bc3e41f51c2fea2de1fdd"
+}

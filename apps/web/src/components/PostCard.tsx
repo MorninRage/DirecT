@@ -7,7 +7,7 @@ import { RELAY } from "../config";
 import type { EventHeader } from "../eip712";
 import { submitEvent } from "../lib/submitEvent";
 import { ReactionStrip } from "./ReactionStrip";
-import type { Emotion } from "../reactions";
+import { formatReactionMetricLine, type Emotion } from "../reactions";
 
 export type FeedPost = {
   eid: string;
@@ -34,7 +34,13 @@ export type PostMetrics = {
   reactions: Record<string, number>;
 };
 
-type CommentRow = { eid: string; author: string; timestamp: number; text: string };
+type CommentRow = {
+  eid: string;
+  author: string;
+  timestamp: number;
+  text: string;
+  direct_handle?: string | null;
+};
 
 function profilePathFor(handle: string | null | undefined, author: string) {
   return handle ? `/u/${handle}` : `/direct/${author}`;
@@ -88,6 +94,7 @@ export function PostCard({
     profile && address && profile.linkedWallets.some((a) => a.toLowerCase() === address.toLowerCase())
       ? profile.handle
       : null;
+  const commentHandle = reshareHandle;
 
   const loadComments = async () => {
     const r = await fetch(`${RELAY}/v1/posts/${post.eid}/comments`);
@@ -130,7 +137,9 @@ export function PostCard({
   const onReshare = async () => {
     if (!address) return;
     if (!reshareHandle) {
-      alert("Link your signing wallet to your profile in Settings to reshare — your repost will appear on My page and in the network feed.");
+      alert(
+        "Link your signing wallet to your profile on the Wallet link page to reshare — your repost will appear on My page and in the network feed.",
+      );
       return;
     }
     try {
@@ -172,7 +181,9 @@ export function PostCard({
   const onComment = async () => {
     if (!commentText.trim()) return;
     try {
-      await sendChild("comment", { text: commentText.trim() });
+      const extra: Record<string, unknown> = { text: commentText.trim() };
+      if (commentHandle) extra.direct_handle = commentHandle;
+      await sendChild("comment", extra);
       setCommentText("");
       await loadComments();
       await onRefreshMetrics();
@@ -181,16 +192,38 @@ export function PostCard({
     }
   };
 
-  const summary = metrics
-    ? Object.entries(metrics.reactions)
-        .filter(([, n]) => n > 0)
-        .map(([k, n]) => `${k}:${n}`)
-        .join(" · ")
-    : null;
+  const onDeletePost = async () => {
+    if (!address) return;
+    if (address.toLowerCase() !== post.author.toLowerCase()) return;
+    if (!window.confirm("Remove this post from feeds? This cannot be undone on the relay.")) return;
+    try {
+      const body: Record<string, unknown> = {
+        type: "post_delete",
+        schema: "direct.post_delete.v1",
+        target_eid: post.eid,
+        created_at: new Date().toISOString(),
+      };
+      const header: EventHeader = {
+        author: address as Address,
+        schema: "direct.post_delete.v1",
+        timestamp: Math.floor(Date.now() / 1000),
+        nonce: crypto.randomUUID(),
+        prev_eid: null,
+      };
+      const payload = await signEnvelope(header, body);
+      await submitEvent(payload);
+      await onFeedRefresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const summary = metrics ? formatReactionMetricLine(metrics.reactions) : null;
 
   const orig = post.original;
   const isRepost = Boolean(post.repost_of && orig);
   const hasMedia = Boolean(post.media?.some((m) => m.cid));
+  const canDelete = Boolean(address && post.author.toLowerCase() === address.toLowerCase());
 
   return (
     <article className="hud-post">
@@ -271,21 +304,41 @@ export function PostCard({
         <button type="button" className="hud-btn" onClick={() => setShowComments((v) => !v)}>
           {showComments ? "Hide comments" : "Comments"}
         </button>
+        {canDelete ? (
+          <button type="button" className="hud-btn" onClick={() => void onDeletePost()}>
+            Delete post
+          </button>
+        ) : null}
       </div>
 
       {showComments ? (
         <div style={{ marginTop: 10 }}>
           <ul style={{ listStyle: "none", padding: 0, margin: "0 0 10px", display: "grid", gap: 8 }}>
             {comments.map((c) => (
-              <li key={c.eid} className="hud-mono" style={{ fontSize: 12, borderLeft: "2px solid rgba(126,203,255,0.35)", paddingLeft: 8 }}>
+              <li key={c.eid} style={{ fontSize: 13, borderLeft: "2px solid rgba(126,203,255,0.35)", paddingLeft: 8 }}>
                 <div style={{ color: "var(--hud-dim)" }}>
-                  {c.author.slice(0, 6)}… · {new Date(c.timestamp * 1000).toLocaleString()}
+                  {c.direct_handle ? (
+                    <Link className="hud-link" to={`/u/${c.direct_handle}`}>
+                      @{c.direct_handle}
+                    </Link>
+                  ) : (
+                    <span className="hud-mono">
+                      {c.author.slice(0, 6)}…{c.author.slice(-4)}
+                    </span>
+                  )}{" "}
+                  · {new Date(c.timestamp * 1000).toLocaleString()}
                 </div>
                 <div style={{ whiteSpace: "pre-wrap" }}>{c.text}</div>
               </li>
             ))}
           </ul>
-          <textarea className="hud-textarea" style={{ minHeight: 72 }} value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment…" />
+          <textarea
+            className="hud-textarea"
+            style={{ minHeight: 72 }}
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Write a comment…"
+          />
           <div style={{ marginTop: 8 }}>
             <button type="button" className="hud-btn hud-btn--primary" disabled={!address || !commentText.trim()} onClick={() => void onComment()}>
               Post comment

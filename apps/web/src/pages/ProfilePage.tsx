@@ -4,6 +4,7 @@ import { PostCard, type FeedPost } from "../components/PostCard";
 import { RELAY } from "../config";
 import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { useAccountProfile } from "../auth/AccountProvider";
+import { SigningWalletSection } from "../components/SigningWalletSection";
 
 type Metrics = { views: number; shares: number; comments: number; reactions: Record<string, number> };
 
@@ -13,7 +14,7 @@ export function ProfilePage() {
   const { addr } = useParams<{ addr: string }>();
   const addressParam = (addr ?? "").toLowerCase();
   const { address } = useDirectAuth();
-  const { profile } = useAccountProfile();
+  const { profile, token } = useAccountProfile();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [metrics, setMetrics] = useState<Record<string, Metrics>>({});
 
@@ -53,6 +54,7 @@ export function ProfilePage() {
 
   return (
     <>
+      {token && profile && isSelf ? <SigningWalletSection /> : null}
       <section className="hud-panel">
         <div className="hud-label">Wallet link</div>
         <h1 style={{ margin: "6px 0", fontSize: 20, letterSpacing: "0.12em", textTransform: "uppercase" }}>

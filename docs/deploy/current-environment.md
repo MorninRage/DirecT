@@ -1,5 +1,11 @@
 # Current deployment snapshot (testnet / production-aligned)
 
+**Scope:** This file describes the **live beta stack on Base Sepolia** (chain `84532`)—URLs, contracts, operator runbooks. It does **not** describe a future Base **mainnet** deploy.
+
+**Maintenance:** If you change the Fly relay URL, Netlify site URL, or on-chain contract addresses, update this file **and** the same values in repository root [`netlify.toml`](../../netlify.toml) (`VITE_RELAY_URL`, etc.), [`relay/fly.toml`](../../relay/fly.toml) (`app` name), and the snapshot table in [README.md](../../README.md). See [.github/README.md](../../.github/README.md) for a full checklist.
+
+**Mainnet cutover + beta credit preservation** (same Merkle/`claim` system; how users keep credited amounts): see **[testnet-to-mainnet-roadmap.md](testnet-to-mainnet-roadmap.md)**.
+
 Single place to see **what is live** today. **Update this file** (or replace the contract table with “see local `contracts/deployments/baseSepolia.json`”) whenever you **redeploy contracts** or change hosting URLs. For a longer **capabilities + roadmap** narrative, see [status-and-roadmap.md](../STATUS-AND-ROADMAP.md).
 
 | Layer | Detail |
@@ -19,6 +25,26 @@ Authoritative addresses after a deploy live in **`contracts/deployments/baseSepo
 | **EmissionsController** | `0xD6FCCb66be9B28577a90A11D8A4b1Fd80a7e90a1` |
 
 Genesis (from `contracts/scripts/deploy.ts`): **1B DIR** minted to deployer treasury; **10M DIR** transferred into `EmissionsController` as the MVP rewards pool for Merkle claims.
+
+## Reward epochs (Merkle inventory, testnet)
+
+Policy caps use **`perUserCapWei`** in [`contracts/scripts/example-epoch-policy.json`](../../contracts/scripts/example-epoch-policy.json). **`build-epoch.cjs`** scores posts with **`direct_handle`** using relay metrics, pays **pro-rata** from the epoch **pool**, then **clips** each beneficiary at the per-user cap. Beneficiary = **`payoutAddress`** else **last** entry in **`linkedWallets`** (see script).
+
+| Epoch ID | Cap (DIR) | `registerRoot` tx | Relay `POST /v1/admin/rewards-epochs` |
+|----------|-----------|-------------------|----------------------------------------|
+| `m3-demo-1` | 5,000 | `0x595ef624b7a1a33cc1df78a0cc418ac7d7afe39012020fb5a6888d48f11c0fd3` | Done (legacy; body in repo `publish-body.json`) |
+| `m3-demo-2` | **10,000** | `0x5368bf1d3f2899cb8fd29020d761bbfe34a6fecbda0bc3e41f51c2fea2de1fdd` | **Publish** with curl below (needs `INDEXER_SECRET`) |
+
+Artifact: [`epochs/epoch-m3-demo-2.json`](../../epochs/epoch-m3-demo-2.json). POST body template: [`publish-body-m3-demo-2.json`](../../publish-body-m3-demo-2.json).
+
+```bash
+curl -fsS -X POST "https://morninrage-direct-relay.fly.dev/v1/admin/rewards-epochs" \
+  -H "Content-Type: application/json" \
+  -H "x-indexer-secret: $INDEXER_SECRET" \
+  -d @publish-body-m3-demo-2.json
+```
+
+After `201`, **`GET /v1/rewards/epochs/latest`** should return **`id`: `m3-demo-2`** and eligible users see **10,000 DIR** on **Rewards** (claim still requires gasless relay setup + active root on-chain).
 
 ## Why Rewards shows “No epoch published on the relay yet”
 
@@ -59,6 +85,39 @@ curl -fsS -X POST "https://morninrage-direct-relay.fly.dev/v1/admin/rewards-epoc
 
 After a `201`, reload **Rewards**: eligible users (wallets in **`allocations`**) see amounts and can **`claim`** if the root is active on-chain and the pool is funded.
 
+## Gasless Claim — one-time operator setup (fixes “Gasless claim is off” in the web app)
+
+**End users never open Fly.** Only you (operator) configure this once per environment.
+
+1. **Check relay:**
+
+   ```bash
+   curl -sS "https://morninrage-direct-relay.fly.dev/health"
+   ```
+
+   - `"sponsoredClaim": true` → gasless Claim is **ready**.
+   - `"sponsoredClaim": false` → Fly secrets are missing or invalid → users always see the error until this is fixed.
+
+2. **Set secrets** (replace values; use the same **EmissionsController** address as in Netlify `VITE_EMISSIONS_ADDRESS`):
+
+   ```bash
+   fly secrets set RELAYER_PRIVATE_KEY=0xYOUR_64_HEX_PRIVATE_KEY EMISSIONS_ADDRESS=0xYOUR_EMISSIONS_CONTROLLER -a morninrage-direct-relay
+   ```
+
+   - `RELAYER_PRIVATE_KEY` must be **`0x` + exactly 64 hex characters** (32-byte key).
+   - `EMISSIONS_ADDRESS` must be **`0x` + 40 hex characters** (contract address above must match your live deployment / Netlify).
+
+3. **Fund the relayer with Base Sepolia ETH** (gas for `claim` txs). Same CDP flow as deploy:
+
+   - **Easiest on testnet:** use the **same** private key for Fly `RELAYER_PRIVATE_KEY` as `DEPLOYER_PRIVATE_KEY`. Then `npm run ensure:gas --prefix contracts` (CDP) tops up **one** address for deploy + gasless claims.
+   - **If relayer is a different key:** add `RELAYER_PRIVATE_KEY` to **`contracts/.env`** (never commit), run `npm run ensure:gas --prefix contracts` again — the script will CDP-fund the relayer address too when it is below `OPERATOR_MIN_ETH`.
+
+4. **Redeploy if needed** — after `fly secrets set`, Fly restarts machines. Run `fly deploy -a morninrage-direct-relay` if `/health` still shows `sponsoredClaim: false`.
+
+5. **Netlify** — production build must include `VITE_EMISSIONS_ADDRESS` (and token) pointing at the **same** contracts. Redeploy the site after changing env vars.
+
+**Order of confusion to avoid:** `sponsoredClaim: false` is **only** about missing/malformed Fly secrets — not about users, not about “epoch broken.” Fix secrets + fund relayer first; then Claim works for everyone signed in.
+
 **Step-by-step (including “who runs what” for users vs operators):** [first-epoch-cookbook.md](first-epoch-cookbook.md)
 
 ## Automation (`contracts/`)
@@ -97,7 +156,7 @@ Secrets: **`contracts/.env`** — never commit. See `contracts/.env.example`.
 
 5. **Publish metadata to relay:** `POST /v1/admin/rewards-epochs` with JSON body `{ id, root, chainId, publishedAtMs, registerTxHash?, allocations }` matching the epoch file (same `x-indexer-secret` header).
 
-6. **Claim:** Netlify app must have `VITE_EMISSIONS_ADDRESS` + `VITE_TOKEN_ADDRESS` + chain **84532**. User opens **Rewards** (`/claim`), connects the beneficiary wallet, submits `claim`.
+6. **Claim:** Netlify app must have `VITE_EMISSIONS_ADDRESS` + `VITE_TOKEN_ADDRESS` + chain **84532**. User opens **Rewards** (`/claim`), stays **signed in**, taps **Claim DIR** — the relay submits the transaction (gasless) if **`/health` → `sponsoredClaim: true`**. DIR lands on the **beneficiary** shown (payout address or linked wallet per epoch rules), not necessarily the embedded signing key; check Wallet / block explorer for that address.
 
 Users trust the relay-published `allocations` list matches the on-chain root (verify `root` locally by rebuilding the tree).
 
@@ -113,6 +172,7 @@ Set in Netlify UI or via `netlify env:set` / sync script; mirrored in root [`net
 
 ## Future work
 
+- **Base mainnet:** Full phased checklist and **beta user credit** (genesis mainnet epoch) → [testnet-to-mainnet-roadmap.md](testnet-to-mainnet-roadmap.md).
 - Stronger **manifest trust** (IPFS CID or signed attestations tying `root` to `allocations`).
 - Optional **auditable follow** events in the signed protocol instead of relay-only edges.
 

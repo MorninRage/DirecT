@@ -145,7 +145,9 @@ function main() {
         }
       } else if (Array.isArray(acc?.linkedWallets) && acc.linkedWallets.length > 0) {
         try {
-          ben = ethers.getAddress(String(acc.linkedWallets[0]).trim());
+          const arr = acc.linkedWallets;
+          const pick = arr[arr.length - 1];
+          ben = ethers.getAddress(String(pick).trim());
         } catch {
           skippedNoBeneficiary.push(handle);
           continue;

@@ -91,11 +91,11 @@ export function PostComposer({
       ) : null}
       {handleForPost ? (
         <div className="hud-mono" style={{ marginBottom: 8, fontSize: 12 }}>
-          Posting as @{handleForPost} (wallet must be linked in Settings).
+          Posting as @{handleForPost} (wallet must be linked on the Wallet link page).
         </div>
       ) : address ? (
         <div style={{ fontSize: 12, color: "var(--hud-dim)", marginBottom: 8 }}>
-          This post won’t carry a profile handle until you link your signing wallet in Settings.
+          This post won’t carry a profile handle until you link your signing wallet from the Wallet link page.
         </div>
       ) : null}
       <textarea

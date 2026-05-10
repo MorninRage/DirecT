@@ -1,7 +1,7 @@
 # DirecT relay API — https://fly.io/docs
 # GitHub: https://github.com/MorninRage/DirecT — deploy from relay/:  fly deploy
 #
-# Persisted on volume (/data): relay-state.json, events-state.json, rewards-epochs.json, media/
+# Persisted on volume (/data): relay-state.json, events-state.json (all signed events incl. post_delete), rewards-epochs.json, media/
 # If this app name is taken globally, pick another and update netlify.toml VITE_RELAY_URL.
 #
 # Secrets (set via fly secrets set — never commit):

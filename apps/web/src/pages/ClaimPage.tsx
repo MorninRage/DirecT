@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { formatEther, getAddress, type Hex } from "viem";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
+import { useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { appChain } from "../chains";
 import { useAccountProfile } from "../auth/AccountProvider";
-import { useDirectAuth } from "../auth/DirectAuthProvider";
 import { apiLatestRewardEpoch, apiSponsoredClaim, type PublishedRewardEpoch } from "../api/relayAccounts";
 import type { AccountProfile } from "../types/account";
+import { preferredMerkleBeneficiary } from "../lib/rewardBeneficiary";
+import { merkleClaimLeaf } from "../lib/merkleClaimLeaf";
 import { EMISSIONS_ADDRESS, RELAY, TOKEN_ADDRESS } from "../config";
 import { emissionsControllerAbi } from "../abi/emissionsController";
 
@@ -37,20 +38,15 @@ function allocationCandidates(profile: AccountProfile): Set<string> {
 export function ClaimPage() {
   const queryClient = useQueryClient();
   const { token, profile } = useAccountProfile();
-  /** Signing address: matches Wallet panel / feed (includes embedded “local” keys). */
-  const { address, mode, broadcastWriteContract } = useDirectAuth();
-  const { isConnected: wagmiConnected } = useAccount();
   const publicClient = usePublicClient({ chainId: appChain.id });
   const [epoch, setEpoch] = useState<PublishedRewardEpoch | null | undefined>(undefined);
   const [rootActive, setRootActive] = useState<boolean | undefined>(undefined);
   const [txErr, setTxErr] = useState("");
-  const [localPending, setLocalPending] = useState(false);
-  const [localHash, setLocalHash] = useState<Hex | undefined>();
   const [sponsoredPending, setSponsoredPending] = useState(false);
   const [sponsoredHash, setSponsoredHash] = useState<Hex | undefined>();
+  const [leafClaimed, setLeafClaimed] = useState<boolean | undefined>(undefined);
 
-  const { writeContract, data: wagmiHash, isPending, error: writeErr } = useWriteContract();
-  const hash = wagmiHash ?? localHash ?? sponsoredHash;
+  const hash = sponsoredHash;
   const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({ hash });
 
   useEffect(() => {
@@ -81,9 +77,14 @@ export function ClaimPage() {
     setBeneficiaryPick((prev) => {
       const ok = prev && matchingAllocations.some((r) => r.beneficiary.toLowerCase() === prev.toLowerCase());
       if (ok) return getAddress(prev as `0x${string}`);
-      return getAddress(matchingAllocations[0].beneficiary as `0x${string}`);
+      const pref = profile ? preferredMerkleBeneficiary(profile) : null;
+      if (pref) {
+        const hit = matchingAllocations.find((r) => r.beneficiary.toLowerCase() === pref.toLowerCase());
+        if (hit) return getAddress(hit.beneficiary as `0x${string}`);
+      }
+      return getAddress(matchingAllocations[0]!.beneficiary as `0x${string}`);
     });
-  }, [matchingAllocations]);
+  }, [matchingAllocations, profile]);
 
   const treeAndProof = useMemo(() => {
     if (!epoch || !EMISSIONS_ADDRESS) return null;
@@ -125,81 +126,81 @@ export function ClaimPage() {
   }, [publicClient, epoch?.root]);
 
   useEffect(() => {
-    if (!confirmed || !hash || !TOKEN_ADDRESS) return;
+    void (async () => {
+      if (!publicClient || !EMISSIONS_ADDRESS || !epoch?.root) {
+        setLeafClaimed(undefined);
+        return;
+      }
+      if (!treeAndProof || "error" in treeAndProof) {
+        setLeafClaimed(undefined);
+        return;
+      }
+      const leaf = merkleClaimLeaf(treeAndProof.beneficiary, treeAndProof.amount);
+      try {
+        const c = await publicClient.readContract({
+          address: EMISSIONS_ADDRESS,
+          abi: emissionsControllerAbi,
+          functionName: "claimed",
+          args: [epoch.root as Hex, leaf],
+        });
+        setLeafClaimed(Boolean(c));
+      } catch {
+        setLeafClaimed(undefined);
+      }
+    })();
+  }, [publicClient, EMISSIONS_ADDRESS, epoch?.root, treeAndProof, confirmed, hash]);
+
+  useEffect(() => {
+    if (!confirmed || !hash || !TOKEN_ADDRESS || !profile) return;
     const addrs: `0x${string}`[] = [];
-    if (address) addrs.push(getAddress(address));
+    if (profile.payoutAddress?.trim()) {
+      try {
+        addrs.push(getAddress(profile.payoutAddress.trim() as `0x${string}`));
+      } catch {
+        /* skip */
+      }
+    }
+    for (const w of profile.linkedWallets ?? []) {
+      try {
+        addrs.push(getAddress(w as `0x${string}`));
+      } catch {
+        /* skip */
+      }
+    }
     if (treeAndProof && "beneficiary" in treeAndProof) addrs.push(getAddress(treeAndProof.beneficiary));
     const uniq = [...new Set(addrs.map((a) => a.toLowerCase()))].map((l) => getAddress(l as `0x${string}`));
     for (const a of uniq) {
       void queryClient.invalidateQueries({ queryKey: ["wallet", "dir-bal", a, TOKEN_ADDRESS] });
       void queryClient.invalidateQueries({ queryKey: ["wallet", "eth", a, appChain.id] });
     }
-  }, [confirmed, hash, address, treeAndProof, queryClient, TOKEN_ADDRESS]);
+  }, [confirmed, hash, profile, treeAndProof, queryClient, TOKEN_ADDRESS]);
 
   const onClaim = useCallback(async () => {
     setTxErr("");
-    setLocalHash(undefined);
     setSponsoredHash(undefined);
     if (!epoch || !EMISSIONS_ADDRESS || !treeAndProof || "error" in treeAndProof) return;
+    if (!token) {
+      setTxErr("Sign in to claim.");
+      return;
+    }
 
-    if (token) {
-      setSponsoredPending(true);
-      try {
-        const { txHash } = await apiSponsoredClaim(token, treeAndProof.beneficiary);
-        setSponsoredHash(txHash as Hex);
-        return;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!msg.includes("sponsored_claim_disabled")) {
-          setTxErr(msg);
-          return;
-        }
-        /* Relay has no RELAYER_PRIVATE_KEY — fall back to user-paid gas. */
-      } finally {
-        setSponsoredPending(false);
+    setSponsoredPending(true);
+    try {
+      const { txHash } = await apiSponsoredClaim(token, treeAndProof.beneficiary);
+      setSponsoredHash(txHash as Hex);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("sponsored_claim_disabled")) {
+        setTxErr(
+          "Gasless claim is off: the relay must have RELAYER_PRIVATE_KEY and EMISSIONS_ADDRESS (Fly secrets), and the relayer needs Base Sepolia ETH. EMISSIONS_ADDRESS must match this site’s VITE_EMISSIONS_ADDRESS.",
+        );
+      } else {
+        setTxErr(msg);
       }
+    } finally {
+      setSponsoredPending(false);
     }
-
-    if (!address) {
-      setTxErr("Open Wallet and sign in. If gasless claim is off, you need a wallet with Base Sepolia ETH.");
-      return;
-    }
-
-    if (mode === "local") {
-      setLocalPending(true);
-      void broadcastWriteContract({
-        address: EMISSIONS_ADDRESS,
-        abi: emissionsControllerAbi,
-        functionName: "claim",
-        args: [treeAndProof.rootHex, treeAndProof.beneficiary, treeAndProof.amount, treeAndProof.proof],
-      })
-        .then((h) => setLocalHash(h))
-        .catch((e: unknown) => setTxErr(e instanceof Error ? e.message : String(e)))
-        .finally(() => setLocalPending(false));
-      return;
-    }
-
-    if (!wagmiConnected) {
-      setTxErr("Open Wallet (top bar) and connect MetaMask / Coinbase on Base Sepolia.");
-      return;
-    }
-
-    writeContract({
-      address: EMISSIONS_ADDRESS,
-      abi: emissionsControllerAbi,
-      functionName: "claim",
-      args: [treeAndProof.rootHex, treeAndProof.beneficiary, treeAndProof.amount, treeAndProof.proof],
-    });
-  }, [
-    epoch,
-    address,
-    token,
-    treeAndProof,
-    writeContract,
-    mode,
-    broadcastWriteContract,
-    wagmiConnected,
-  ]);
+  }, [epoch, token, treeAndProof]);
 
   if (!token || !profile) {
     return (
@@ -246,9 +247,8 @@ export function ClaimPage() {
       <div className="hud-label">Claim DIR</div>
       <h1 style={{ margin: "6px 0 12px", fontSize: 20 }}>Epoch {epoch.id}</h1>
       <p style={{ fontSize: 13, color: "var(--hud-dim)", lineHeight: 1.55 }}>
-        The contract sends DIR to the <strong>allocation address</strong> below. When your DirecT relay is configured for
-        gasless claims, you only need to be signed in — DirecT submits the transaction. Otherwise your signing wallet pays
-        a small amount of Base Sepolia ETH.
+        The contract sends DIR to the <strong>allocation address</strong> below. Claims are <strong>gasless</strong>: after you sign in,
+        DirecT&apos;s relay submits the transaction (you do not pay Base Sepolia ETH).
       </p>
       <ul style={{ fontSize: 12, lineHeight: 1.6, color: "var(--hud-dim)", wordBreak: "break-all" }}>
         <li>Root: {epoch.root}</li>
@@ -259,20 +259,9 @@ export function ClaimPage() {
       </ul>
 
       <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-        <div className="hud-mono" style={{ fontSize: 12 }}>
-          {address ? (
-            <>
-              <span style={{ color: "var(--hud-dim)" }}>Signing (only if you pay gas yourself):</span> {address}
-            </>
-          ) : (
-            <span style={{ color: "var(--hud-dim)" }}>
-              Signed in — with gasless claims, no browser wallet is required here.
-            </span>
-          )}
-        </div>
-        {mode === "wallet" && !wagmiConnected ? (
-          <div className="hud-alert">Wallet mode needs an active browser wallet connection. Open Wallet and connect MetaMask / Coinbase.</div>
-        ) : null}
+        <p className="hud-mono" style={{ fontSize: 12, color: "var(--hud-dim)", margin: 0 }}>
+          Signed in as <strong>@{profile.handle}</strong> — no browser wallet required to claim.
+        </p>
         {matchingAllocations.length > 1 ? (
             <label style={{ display: "grid", gap: 6, fontSize: 13 }}>
               <span style={{ color: "var(--hud-dim)" }}>Allocation to claim (you have several in this epoch)</span>
@@ -297,7 +286,7 @@ export function ClaimPage() {
                   None of your linked wallets or payout address appear in this epoch&apos;s <span className="hud-mono">allocations</span>.
                   Linked: {profile.linkedWallets?.length ? profile.linkedWallets.join(", ") : "(none)"}
                   {profile.payoutAddress ? ` · Payout: ${profile.payoutAddress}` : ""}. The operator builds the tree from
-                  relay data (first linked wallet or payout when the epoch was created).
+                  relay data (payout if set, otherwise your most recently linked wallet — see Settings).
                 </>
               ) : (
                 <>Allocation: {treeAndProof.error}</>
@@ -309,22 +298,46 @@ export function ClaimPage() {
               <span style={{ color: "var(--hud-dim)" }}>DIR goes to:</span> {treeAndProof.beneficiary}
             </div>
             <div>
-              Amount: <strong>{formatEther(treeAndProof.amount)} DIR</strong>
+              Epoch allocation: <strong>{formatEther(treeAndProof.amount)} DIR</strong>
             </div>
+            {leafClaimed === undefined ? (
+              <p style={{ fontSize: 12, color: "var(--hud-dim)" }}>Checking on-chain claim status…</p>
+            ) : leafClaimed ? (
+              <>
+                <div>
+                  Remaining to claim: <strong>0 DIR</strong>
+                </div>
+                <p style={{ fontSize: 12, color: "#9fe8c0", margin: 0 }}>
+                  You already claimed this allocation for this epoch. Open <strong>Wallet</strong> — DIR is shown on the address above (and under any payout /
+                  linked rows if it differs from your signer).
+                </p>
+              </>
+            ) : (
+              <div>
+                Remaining to claim: <strong>{formatEther(treeAndProof.amount)} DIR</strong>
+              </div>
+            )}
             <button
               type="button"
               className="hud-btn hud-btn--primary"
-              disabled={rootActive === false || isPending || confirming || localPending || sponsoredPending}
+              disabled={
+                rootActive === false || confirming || sponsoredPending || leafClaimed === true || leafClaimed === undefined
+              }
               onClick={() => void onClaim()}
             >
-              {sponsoredPending || localPending || isPending || confirming ? "Submitting…" : "Claim DIR"}
+              {leafClaimed === true
+                ? "Already claimed"
+                : leafClaimed === undefined
+                  ? "Checking status…"
+                  : sponsoredPending || confirming
+                    ? "Submitting…"
+                    : "Claim DIR"}
             </button>
             {rootActive === false ? (
               <p style={{ fontSize: 12, color: "#ffb4b4" }}>Root not active — registerRoot must succeed on-chain before claiming.</p>
             ) : null}
           </>
         ) : null}
-        {writeErr ? <div className="hud-alert">{writeErr.message}</div> : null}
         {txErr ? <div className="hud-alert">{txErr}</div> : null}
         {hash ? (
           <div style={{ fontSize: 12 }}>
@@ -335,8 +348,8 @@ export function ClaimPage() {
       </div>
 
       <p style={{ marginTop: 20, fontSize: 12, color: "var(--hud-dim)" }}>
-        Signing mode: <strong>{mode}</strong> — after a successful claim, reopen <strong>Wallet</strong> or refresh; DIR balance updates from chain. Wrong
-        network? Use &quot;Align chain&quot; in the header (browser wallets).
+        After a successful claim, open <strong>Wallet</strong> — DIR balance appears on the <strong>beneficiary address</strong> above. If that is not your signing
+        address, use the payout / linked rows in the wallet panel.
       </p>
       <Link className="hud-link" to="/" style={{ display: "inline-block", marginTop: 12 }}>
         ← Feed

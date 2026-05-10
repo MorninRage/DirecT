@@ -46,7 +46,7 @@ Use a wallet on the **same chain ID** as the relay (`CHAIN_ID` env, default `845
 
 ## Deploy / ship online
 
-Full checklist: **[`docs/deploy/online.md`](docs/deploy/online.md)**
+Full checklist: **[`docs/deploy/online.md`](docs/deploy/online.md)** — after changing Fly or Netlify URLs or redeploying contracts, keep **[`docs/deploy/current-environment.md`](docs/deploy/current-environment.md)**, root **`netlify.toml`**, and **`relay/fly.toml`** in sync (see [.github/README.md](.github/README.md)).
 
 **One command** (from `contracts/`, Netlify CLI logged in, CDP keys in `contracts/.env` optional but recommended for no-browser gas):
 

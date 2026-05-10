@@ -18,4 +18,14 @@ export const emissionsControllerAbi = [
     inputs: [{ name: "", type: "bytes32" }],
     outputs: [{ name: "active", type: "bool" }],
   },
+  {
+    type: "function",
+    name: "claimed",
+    stateMutability: "view",
+    inputs: [
+      { name: "root", type: "bytes32" },
+      { name: "leaf", type: "bytes32" },
+    ],
+    outputs: [{ name: "isClaimed", type: "bool" }],
+  },
 ] as const;

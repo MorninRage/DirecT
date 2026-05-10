@@ -100,6 +100,8 @@ body {
   padding: 72px 16px 24px;
   max-width: 920px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 /* User home (/u/:handle): full viewport width for draggable grid canvas */
@@ -110,6 +112,8 @@ body {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   box-sizing: border-box;
+  position: relative;
+  z-index: 1;
 }
 
 .hud-topbar {
@@ -147,6 +151,7 @@ body {
 }
 
 .hud-btn {
+  position: relative;
   border-radius: 999px;
   border: 1px solid rgba(130, 180, 230, 0.35);
   background: linear-gradient(180deg, rgba(40, 60, 80, 0.6), rgba(15, 22, 32, 0.85));
@@ -157,13 +162,44 @@ body {
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  box-shadow: var(--hud-rim), var(--hud-glow);
-  transition: transform 0.12s ease, border-color 0.12s ease;
+  box-shadow:
+    var(--hud-rim),
+    0 0 20px rgba(100, 190, 255, 0.22),
+    0 0 40px rgba(80, 140, 220, 0.08);
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.hud-btn::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.06);
+  opacity: 0;
+  transition: opacity 0.18s ease;
 }
 
 .hud-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: rgba(180, 220, 255, 0.55);
+  box-shadow:
+    var(--hud-rim),
+    0 0 26px rgba(126, 203, 255, 0.35),
+    0 0 48px rgba(100, 180, 255, 0.15);
+  filter: brightness(1.06);
+}
+
+.hud-btn:hover:not(:disabled)::after {
+  opacity: 1;
+}
+
+.hud-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    var(--hud-rim),
+    0 0 0 2px rgba(10, 20, 30, 0.95),
+    0 0 0 4px rgba(126, 203, 255, 0.65);
 }
 
 .hud-btn:disabled {
@@ -174,6 +210,48 @@ body {
 .hud-btn--primary {
   border-color: rgba(201, 169, 97, 0.55);
   color: #fff4d2;
+  box-shadow:
+    var(--hud-rim),
+    0 0 22px rgba(201, 169, 97, 0.28),
+    0 0 44px rgba(201, 169, 97, 0.1);
+}
+
+.hud-btn--primary:hover:not(:disabled) {
+  box-shadow:
+    var(--hud-rim),
+    0 0 30px rgba(230, 200, 120, 0.4),
+    0 0 56px rgba(201, 169, 97, 0.2);
+}
+
+.hud-btn--reaction {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.hud-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hud-scene-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hud-scene-root canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .hud-panel {

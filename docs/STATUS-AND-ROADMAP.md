@@ -20,7 +20,9 @@ Social layer v1 adds **asymmetric follow**, a **following-scoped feed**, and **n
 
 All **client, relay, and contract code** for Merkle claims is in place. **Rewards** stays empty until an **operator** runs the pipeline documented in [deploy/current-environment.md — “No epoch published”](deploy/current-environment.md#why-rewards-shows-no-epoch-published-on-the-relay-yet) and [§ M3 runbook](deploy/current-environment.md#m3-epoch--claim-runbook): snapshot → **`build-epoch.cjs`** → **`registerRoot`** → **`POST /v1/admin/rewards-epochs`**. There is **no separate automated oracle** in-repo; cadence (weekly, monthly, etc.) is your ops choice.
 
-After the first epoch is published, **paid users** (testnet DIR) are whoever appears in **`allocations`** and successfully **`claim`**s with the linked wallet.
+After the first epoch is published, **eligible users** (wallets in **`allocations`**) can **`claim`**; on **Sepolia** the DIR is **beta / play-money**. **Mainnet** and **crediting beta amounts on mainnet** use the **same claim flow** but **new contracts** and a **documented snapshot**—see [deploy/testnet-to-mainnet-roadmap.md](deploy/testnet-to-mainnet-roadmap.md).
+
+For **testnet → mainnet** planning (treasury, relayer gas, phases), that roadmap is canonical.
 
 ---
 
@@ -77,7 +79,7 @@ After the first epoch is published, **paid users** (testnet DIR) are whoever app
 - **Auth:** Profile login; wallet connect / embedded key for **signing posts**.
 - **Feed:** Home feed with unlock gate; **All / Following** toggle when session present.
 - **Profiles:** **`/u/:handle`** draggable homepage; **Follow / Unfollow** and follower counts for others’ pages.
-- **Settings:** Bio, images, links, accessibility toggles, **optional payout address**, link signing wallet.
+- **Settings:** Bio, images, links, accessibility toggles, **optional payout address**; signing wallet is linked from **Wallet link** (`/direct/:addr`).
 - **Rewards:** **`/claim`** loads latest epoch from relay, rebuilds Merkle tree from **`allocations`**, checks root active on-chain, submits **`claim`**.
 - **Wallet hub:** Balances + link to Rewards when **`VITE_EMISSIONS_ADDRESS`** is set.
 - **Notifications:** Bell polls **`/notifications`**; deep links for **follow**, **rewards** (open `/claim`).
@@ -178,10 +180,11 @@ Below is a **prioritized backlog** derived from the original phase plan and gaps
 2. **Rate limits and abuse controls** on follow and snapshot (per IP, per account).
 3. **Multiple relays** and **read replicas** (architecture doc updates).
 
-### 6.5 Governance and tokenomics (longer horizon)
+### 6.5 Governance, tokenomics, and mainnet
 
 - Tie emissions caps and epoch cadence to [governance/governance.md](governance/governance.md) and [economics/tokenomics.md](economics/tokenomics.md).
-- Mainnet path: audits, admin key rotation, multisig for **`registerRoot`**.
+- **Mainnet cutover** (phases, treasury, relayer gas, **beta user credits via genesis mainnet epoch**): canonical **[deploy/testnet-to-mainnet-roadmap.md](deploy/testnet-to-mainnet-roadmap.md)** — earlier docs assumed testnet-only context; read that file before promising users mainnet amounts.
+- Mainnet hardening: audits, admin key rotation, multisig for **`registerRoot`** and treasury ops.
 
 ---
 
@@ -191,7 +194,8 @@ Below is a **prioritized backlog** derived from the original phase plan and gaps
 |----------|---------------------|
 | [mvp-scope.md](mvp-scope.md) | Milestone table, M3 checklist, environment variables. |
 | [deploy/first-epoch-cookbook.md](deploy/first-epoch-cookbook.md) | **First payout:** exact commands; operators vs normal users. |
-| [deploy/current-environment.md](deploy/current-environment.md) | Live URLs, contract table, **M3 runbook**, Netlify env. |
+| [deploy/current-environment.md](deploy/current-environment.md) | Live **testnet** URLs, contract table, **M3 runbook**, Netlify env. |
+| [deploy/testnet-to-mainnet-roadmap.md](deploy/testnet-to-mainnet-roadmap.md) | **Mainnet migration**, beta credit preservation, myths vs facts. |
 | [protocol/README.md](protocol/README.md) | REST routes, snapshot + epoch ingest, wire formats. |
 | [security/threat-model.md](security/threat-model.md) | Adversary model; Sybil/oracle/governance threats (mostly forward-looking). |
 | [explanation/tokens-blockchain-and-content.md](explanation/tokens-blockchain-and-content.md) | Intuition for tokens vs posts. |
